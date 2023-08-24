@@ -1,0 +1,351 @@
+{
+	"info": {
+		"_postman_id": "cb66f9fd-0346-4279-8352-192cc083fd99",
+		"name": "Bitacora",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2122809"
+	},
+	"item": [
+		{
+			"name": "FlightData",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {
+					"user-agent": true,
+					"accept": true,
+					"accept-encoding": true
+				}
+			},
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"device_id\": \"rdrfr\",\n    \"timestamp\": 10000,\n    \"signature\": \"Fg6tt7UKb==\",\n    \"localization\": {\n        \"longitude\": 42.45323,\n        \"latitude\": -150.4774\n    },\n    \"payload\": \"ftjrek\",\n    \"signature_full\": \"8JK9u54=\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_uri}}/flight_data",
+					"host": [
+						"{{base_uri}}"
+					],
+					"path": [
+						"flight_data"
+					]
+				},
+				"description": "The endpoint to call when submitting new flight data from the Certiflight device.\n\npayload and signature_full are optional"
+			},
+			"response": [
+				{
+					"name": "Live lightweight data",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"device_id\": \"rdrfr\",\n    \"timestamp\": 10000,\n    \"localization\": {\n        \"longitude\": 42.45323,\n        \"latitude\": -150.4774\n    },\n    \"signature\": \"Fg6tt7UKb==\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_uri}}/flight_data",
+							"host": [
+								"{{base_uri}}"
+							],
+							"path": [
+								"flight_data"
+							]
+						}
+					},
+					"status": "Created",
+					"code": 201,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json",
+							"name": "Content-Type",
+							"description": "",
+							"type": "text"
+						}
+					],
+					"cookie": [],
+					"body": "{\n    \"id\": \"\",\n    \"dataset_id\": \"\"\n}"
+				}
+			]
+		},
+		{
+			"name": "FlightData",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {
+					"user-agent": true,
+					"accept": true,
+					"accept-encoding": true
+				}
+			},
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"device_id\": \"rdrfr\",\n    \"user_id\": \"seqsxw\",\n    \"timestamp\": 10000,\n    \"additional_data\": \"ftjrek\",\n    \"signature\": \"signature\",\n    \"localization\": {\n        \"longitude\": 290293,\n        \"latitude\": 39223231\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_uri}}/flight_data",
+					"host": [
+						"{{base_uri}}"
+					],
+					"path": [
+						"flight_data"
+					]
+				},
+				"description": "The endpoint to call when submitting new flight data from the Certiflight device."
+			},
+			"response": [
+				{
+					"name": "Update full data",
+					"originalRequest": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"id\": \"rdrfr\",\n    \"payload\": \"ftjrek\",\n    \"signature_full\": \"\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_uri}}/flight_data",
+							"host": [
+								"{{base_uri}}"
+							],
+							"path": [
+								"flight_data"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json",
+							"name": "Content-Type",
+							"description": "",
+							"type": "text"
+						}
+					],
+					"cookie": [],
+					"body": ""
+				}
+			]
+		},
+		{
+			"name": "FlightData",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_uri}}/flight_data?id",
+					"host": [
+						"{{base_uri}}"
+					],
+					"path": [
+						"flight_data"
+					],
+					"query": [
+						{
+							"key": "id",
+							"value": null,
+							"description": "The Id of the submission to look for"
+						}
+					]
+				},
+				"description": "Returns the information for a certain flight data submission fetch them by Id. The Id can be calculated by hashing the byte concatenation of timestamp, localization and signature."
+			},
+			"response": [
+				{
+					"name": "Light data",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_uri}}/flight_data?id=some_id",
+							"host": [
+								"{{base_uri}}"
+							],
+							"path": [
+								"flight_data"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "some_id",
+									"description": "The Id of the submission to look for"
+								}
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"body": "{\n    \"id\": \"some_id\",\n    \"timestamp\": 10000,\n    \"localization\": {\n        \"longitude\": 42.45323,\n        \"latitude\": -150.4774\n    },\n    \"signature\": \"Fg6tt7UKb==\",\n    \"device\": {\n        \"id\": \"some_device_id\"\n        \"public_key\": \"the device public key\"\n    }\n}"
+				},
+				{
+					"name": "Full data",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_uri}}/flight_data?id=some_id",
+							"host": [
+								"{{base_uri}}"
+							],
+							"path": [
+								"flight_data"
+							],
+							"query": [
+								{
+									"key": "id",
+									"value": "some_id",
+									"description": "The Id of the submission to look for"
+								}
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"body": "{\n    \"id\": \"some_id\",\n    \"timestamp\": 10000,\n    \"localization\": {\n        \"longitude\": 42.45323,\n        \"latitude\": -150.4774\n    },\n    \"signature\": \"Fg6tt7UKb==\",\n    \"payload\": \"the payload data\",\n    \"signature_full\": \"the signature of the complete data\",\n    \"device\": {\n        \"id\": \"some_device_id\"\n        \"public_key\": \"the device public key\"\n    }\n}"
+				}
+			]
+		},
+		{
+			"name": "Dataset",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true,
+				"disabledSystemHeaders": {
+					"user-agent": true,
+					"accept": true,
+					"accept-encoding": true
+				}
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_uri}}/dataset?id",
+					"host": [
+						"{{base_uri}}"
+					],
+					"path": [
+						"dataset"
+					],
+					"query": [
+						{
+							"key": "id",
+							"value": null,
+							"description": "The Id of the dataset to look for"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_uri}}/device?id",
+					"host": [
+						"{{base_uri}}"
+					],
+					"path": [
+						"device"
+					],
+					"query": [
+						{
+							"key": "id",
+							"value": null,
+							"description": "The Id of the device"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_uri}}/device",
+					"host": [
+						"{{base_uri}}"
+					],
+					"path": [
+						"device"
+					]
+				},
+				"description": "Creates a new device"
+			},
+			"response": []
+		}
+	]
+}
