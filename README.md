@@ -65,10 +65,25 @@ classDiagram
 - **Web3Info** wraps the information regarding a submission to the configured blockchain.
 - **Error** provides a conventional way for error propagation.
 
+### Workflow
+The main workflows of the system are:
+1. Live data submission: (data collected during the flight)
+    1. Submit a new FligthData object with no  `payload` and `signature_full` properties;
+    2. For each device, the system accumulates `FlightData` in a `Dataset`;
+    3. According to a predefined limit, once a `Dataset` is full, the system creates a Merkle tree with its data and submits its root to the blockchain smart contract
+    4. The status of the `Dataset` Merkle tree can be queried with the relative endopoint.
+2. Full data submission: (data collected after the flight)
+    1. Submit a new `FlightData`, including the `payload` and `signature_full` properties; if data was already sent before as light data, already submitted fields can be omitted and the Id of the already existing `FlightData` can be used.
+    2. For each device, the system accumulates `FlightData` in a `Dataset`;
+    3. According to a predefined limit, once a `Dataset` is full, the system creates a Merkle tree with its data and submits its root to the blockchain smart contract
+    4. The status of the `Dataset` Merkle tree can be queried with the relative endopoint.
+
+We could also design an asynchronous mechanism (e.g. a Pub/Sub) for obtaining the `Web3Info` information, so that it is not necessary to poll it periodically untill ready
+
 ### API definition
 The API is defined as a REST API using JSON over HTTP. It generally passes data in the messages body while configurations and options are passed as query parameters.
 
-The following list is a summary of the avialble resources and methods. A precise description with example requests and responses is available in the Postman collection.
+The following list is a summary of the available resources and methods. A precise description with example requests and responses is available in the Postman collection.
 
 - Device
     - GET: Fetch the requested Device information
