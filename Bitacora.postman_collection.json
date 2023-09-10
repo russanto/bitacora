@@ -20,7 +20,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"device_id\": \"rdrfr\",\n    \"timestamp\": 10000,\n    \"signature\": \"Fg6tt7UKb==\",\n    \"localization\": {\n        \"longitude\": 42.45323,\n        \"latitude\": -150.4774\n    },\n    \"payload\": \"ftjrek\",\n    \"signature_full\": \"8JK9u54=\"\n}",
+					"raw": "{\n    \"device_id\": \"HAAvNLAqkKwvqb462M3E9yzugJC4c44AvgZWonMMBAYQ\",\n    \"timestamp\": 10000,\n    \"signature\": \"Fg6tt7UKb==\",\n    \"localization\": {\n        \"longitude\": 42.45323,\n        \"latitude\": -150.4774\n    },\n    \"payload\": \"ftjrek\",\n    \"signature_full\": \"8JK9u54=\"\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -172,18 +172,19 @@
 					}
 				},
 				"url": {
-					"raw": "{{base_uri}}/flight_data?id",
+					"raw": "{{base_uri}}/flight_data/:id",
 					"host": [
 						"{{base_uri}}"
 					],
 					"path": [
-						"flight_data"
+						"flight_data",
+						":id"
 					],
-					"query": [
+					"variable": [
 						{
 							"key": "id",
-							"value": null,
-							"description": "The Id of the submission to look for"
+							"value": "",
+							"description": "The Id of the FlightData to get"
 						}
 					]
 				},
@@ -287,18 +288,19 @@
 					}
 				},
 				"url": {
-					"raw": "{{base_uri}}/dataset?id",
+					"raw": "{{base_uri}}/dataset/:id",
 					"host": [
 						"{{base_uri}}"
 					],
 					"path": [
-						"dataset"
+						"dataset",
+						":id"
 					],
-					"query": [
+					"variable": [
 						{
 							"key": "id",
-							"value": null,
-							"description": "The Id of the dataset to look for"
+							"value": "",
+							"description": "The Id of the Dataset to get"
 						}
 					]
 				}
@@ -311,18 +313,19 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "{{base_uri}}/device?id",
+					"raw": "{{base_uri}}/device/:id",
 					"host": [
 						"{{base_uri}}"
 					],
 					"path": [
-						"device"
+						"device",
+						":id"
 					],
-					"query": [
+					"variable": [
 						{
 							"key": "id",
-							"value": null,
-							"description": "The Id of the device"
+							"value": "",
+							"description": "The Id of the device to get"
 						}
 					]
 				}
@@ -334,6 +337,15 @@
 			"request": {
 				"method": "POST",
 				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"pk\": \"this is the public key\" //the base64 encoding of the public key\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
 				"url": {
 					"raw": "{{base_uri}}/device",
 					"host": [
