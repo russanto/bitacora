@@ -48,7 +48,7 @@ classDiagram
     }
 
     FlightData --o Dataset
-    FlightData --* Device
+    FlightData "0..*" -- "1" Device
     Dataset --* Device
     DatasetStatus --* Dataset
     Web3Info -- Device
