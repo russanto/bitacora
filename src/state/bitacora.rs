@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tracing::{error, warn, info, debug, trace};
 
-use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage};
+use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
 
 use super::entities::{FlightData, DeviceId, Dataset, FlightDataId};
 use super::errors::{NewFlightDataError, NewDatasetError};
@@ -111,5 +111,27 @@ impl <S: FullStorage> DeviceStorage for SharedBitacora<S> {
 
     fn set_device(&self, device: &super::entities::Device) -> Result<bool, crate::storage::errors::Error> {
         self.storage.set_device(device)
+    }
+}
+
+impl <S: FullStorage> DatasetStorage for SharedBitacora<S> {
+    fn add_flight_data(&self, ds_id: &super::entities::DatasetId, fd: &FlightData) -> Result<(), crate::storage::errors::Error> {
+        self.storage.add_flight_data(ds_id, fd)
+    }
+
+    fn set_dataset(&self, ds: &Dataset, device_id: &DeviceId) -> Result<bool, crate::storage::errors::Error> {
+        self.storage.set_dataset(ds, device_id)
+    }
+
+    fn get_dataset(&self, id: &super::entities::DatasetId) -> Result<Option<Dataset>, crate::storage::errors::Error> {
+        self.storage.get_dataset(id)
+    }
+
+    fn get_latest_dataset(&self, device_id: &DeviceId) -> Result<Option<Dataset>, crate::storage::errors::Error> {
+        self.storage.get_latest_dataset(device_id)
+    }
+
+    fn new_dataset_id(&self) -> Result<super::entities::DatasetId, crate::storage::errors::Error> {
+        self.storage.new_dataset_id()
     }
 }

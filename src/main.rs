@@ -12,7 +12,7 @@ pub mod state;
 pub mod storage;
 pub mod web3;
 
-use handlers::{ get_device, get_flight_data, post_device, post_flight_data };
+use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data };
 use storage::in_memory::InMemoryStorage;
 
 type SharedBitacora = Arc<Bitacora<InMemoryStorage>>;
@@ -35,6 +35,7 @@ async fn main() {
         // `POST /users` goes to `create_user`
         .route("/flight_data", post(post_flight_data::handler))
         .route("/flight_data/:id", get(get_flight_data::handler::<SharedBitacora>))
+        .route("/dataset/:id", get(get_dataset::handler::<SharedBitacora>))
         .with_state(shared_bitacora);
 
     // run our app with hyper

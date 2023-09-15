@@ -55,11 +55,10 @@ pub type DatasetId = String;
 
 pub type MerkleTree = ();
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Dataset {
     pub id: DatasetId,
     pub limit: u32,
     pub count: u32,
     pub merkle_tree: Option<MerkleTree>,
 }
-
