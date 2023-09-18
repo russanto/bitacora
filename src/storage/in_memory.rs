@@ -18,6 +18,15 @@ pub struct InMemoryStorage {
 }
 
 impl DeviceStorage for InMemoryStorage {
+    fn new_device(&self, device: &Device) -> Result<(), Error> {
+        let mut write_lock = self.devices.write().unwrap();
+        if write_lock.contains_key(&device.id) {
+            return Err(Error::AlreadyExists);
+        }
+        write_lock.insert(device.id.clone(), device.clone());
+        Ok(())
+    }
+
     fn set_device(&self, device: &Device) -> Result<bool, Error> {
         match self.devices.write().unwrap().insert(device.id.clone(), device.clone()) {
             Some(_) => Ok(true),

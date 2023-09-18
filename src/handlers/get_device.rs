@@ -1,12 +1,13 @@
 use axum::{extract::{State, Path}, http::StatusCode, Json, response::{IntoResponse, Response}};
 
 use crate::storage::storage::DeviceStorage;
+use crate::SharedBitacora;
 
 use super::errors::ErrorResponse;
 
-pub async fn handler<S: DeviceStorage>(
+pub async fn handler(
     Path(id): Path<String>,
-    State(state): State<S>
+    State(state): State<SharedBitacora>
 ) -> Response {
     match state.get_device(&id) {
         Ok(query_result) => {

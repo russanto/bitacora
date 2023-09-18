@@ -1,6 +1,8 @@
 use axum::{http::StatusCode, Json, response::IntoResponse};
 use serde::Serialize;
 
+use crate::state::errors::BitacoraError;
+
 
 #[derive(Debug)]
 pub enum Error {
@@ -69,5 +71,16 @@ impl ErrorResponse {
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> axum::response::Response {
         (self.status, Json(self.body)).into_response()
+    }
+}
+
+impl From<BitacoraError> for ErrorResponse {
+    fn from(value: BitacoraError) -> Self {
+        match value {
+            BitacoraError::AlreadyExists => ErrorResponse::already_exists(),
+            BitacoraError::Web3Error => ErrorResponse::web3_error(),
+            BitacoraError::NotFound => ErrorResponse::not_found(&String::from("CHANGE ME")),
+            BitacoraError::StorageError => ErrorResponse::storage_error()
+        }
     }
 }

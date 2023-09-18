@@ -4,10 +4,9 @@ use axum::{
     Json, response::{IntoResponse, Response}
 };
 
-use serde::{ Deserialize, Serialize };
+use serde::Deserialize;
 
-use crate::state::entities::{Device, PublicKey};
-use crate::storage::storage::DeviceStorage;
+use crate::{state::entities::{Device, PublicKey}, SharedBitacora};
 
 use super::errors::ErrorResponse;
 
@@ -16,27 +15,19 @@ pub struct POSTDeviceRequest {
     pk: String
 }
 
-#[derive(Serialize)]
-pub struct POSTDeviceResponse {
-    id: String
-}
-
 impl From<POSTDeviceRequest> for Device {
     fn from(value: POSTDeviceRequest) -> Self {
         Device::from(PublicKey(value.pk))
     }
 }
 
-pub async fn handler<S: DeviceStorage>(
-    State(state): State<S>,
+pub async fn handler(
+    State(state): State<SharedBitacora>,
     Json(payload): Json<POSTDeviceRequest>
 ) -> Response {
-    let device = Device::from(payload);
-    match state.set_device(&device) {
-        Ok(already_present) => match already_present {
-            true => ErrorResponse::already_exists().into_response(),
-            false => (StatusCode::CREATED, Json(POSTDeviceResponse{ id: device.id })).into_response()
-        },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "error").into_response()
+    let mut device = Device::from(payload);
+    match state.new_device(&mut device) {
+        Ok(()) => (StatusCode::CREATED, Json(device)).into_response(),
+        Err(error) => ErrorResponse::from(error).into_response()
     }
 }

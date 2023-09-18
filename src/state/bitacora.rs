@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use tracing::{warn, info, debug, trace};
 
+use crate::storage::errors::Error as StorageError;
 use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
 use crate::web3::traits::Timestamper;
 
-use super::entities::{FlightData, DeviceId, Dataset, FlightDataId};
+use super::entities::{FlightData, Device, DeviceId, Dataset, FlightDataId};
 use super::errors::BitacoraError;
 
 const DATASET_DEFAULT_LIMIT: u32 = 10;  //TODO: refactor with configuration management
@@ -112,6 +113,31 @@ where
         }
     }
 
+    pub fn new_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
+        match self.storage.new_device(&device) {
+            Ok(_) => (),
+            Err(storage_error) => match storage_error {
+                StorageError::AlreadyExists => return Err(BitacoraError::StorageError),
+                _ => return Err(BitacoraError::StorageError)
+            }
+        };
+        self.timestamp_device(device)
+    }
+
+    fn timestamp_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
+        match self.timestamper.register_device(device) {
+            Ok(web3_info) => {
+                info!(device=device.id, tx_hash=web3_info.tx.hash, "Device submitted to blockchain");
+                device.web3 = Some(web3_info);
+                match self.storage.set_device(device) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(BitacoraError::StorageError)
+                }
+            },
+            Err(_) => Err(BitacoraError::Web3Error)
+        }
+    }
+
     fn timestamp_dataset(&self, dataset: &mut Dataset) -> Result<(), BitacoraError> {
         match self.timestamper.register_dataset(dataset) {
             Ok(web3_info) => {
@@ -138,6 +164,10 @@ impl <S: FullStorage, T: Timestamper> FlightDataStorage for SharedBitacora<S, T>
 }
 
 impl <S: FullStorage, T: Timestamper> DeviceStorage for SharedBitacora<S, T> {
+    fn new_device(&self, device: &Device) -> Result<(), StorageError> {
+        self.storage.new_device(device)
+    }
+
     fn get_device(&self, id: &DeviceId) -> Result<Option<super::entities::Device>, crate::storage::errors::Error> {
         self.storage.get_device(id)
     }

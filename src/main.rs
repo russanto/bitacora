@@ -34,8 +34,8 @@ async fn main() {
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        .route("/device", post(post_device::handler::<SharedBitacora>))
-        .route("/device/:id", get(get_device::handler::<SharedBitacora>))
+        .route("/device", post(post_device::handler))
+        .route("/device/:id", get(get_device::handler))
         // `POST /users` goes to `create_user`
         .route("/flight_data", post(post_flight_data::handler))
         .route("/flight_data/:id", get(get_flight_data::handler::<SharedBitacora>))

@@ -10,10 +10,11 @@ pub struct PublicKey(pub String);
 
 pub type DeviceId = String;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Device {
     pub id: DeviceId,
-    pub pk: PublicKey
+    pub pk: PublicKey,
+    pub web3: Option<Web3Info>
 }
 
 impl From<PublicKey> for Device {
@@ -22,7 +23,8 @@ impl From<PublicKey> for Device {
         hasher.update(value.0.as_bytes());
         Device {
             id: bs58::encode(hasher.finalize()).into_string(),
-            pk: value.clone()
+            pk: value.clone(),
+            web3: None
         }
     }
 }

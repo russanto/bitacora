@@ -5,6 +5,7 @@ use crate::state::entities::{Device, FlightData, Dataset, DatasetId, DeviceId, F
 use super::errors::Error;
 
 pub trait DeviceStorage {
+    fn new_device(&self, device: &Device) -> Result<(), Error>; 
     fn set_device(&self, device: &Device) -> Result<bool, Error>; 
     fn get_device(&self, id: &DeviceId) -> Result<Option<Device>, Error>;
 }
