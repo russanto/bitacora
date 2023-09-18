@@ -1,0 +1,7 @@
+version: '3'
+services:
+    webservice:
+        image: bitacora
+        build: .
+        ports:
+            - 3000:3000
