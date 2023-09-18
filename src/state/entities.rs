@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{ Digest, Sha256 };
 
+use crate::web3::traits::Web3Info;
+
 pub const ID_BYTE_LENGTH: u8 = 16;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -11,7 +13,7 @@ pub type DeviceId = String;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Device {
     pub id: DeviceId,
-    pub pk: PublicKey,
+    pub pk: PublicKey
 }
 
 impl From<PublicKey> for Device {
@@ -61,4 +63,5 @@ pub struct Dataset {
     pub limit: u32,
     pub count: u32,
     pub merkle_tree: Option<MerkleTree>,
+    pub web3: Option<Web3Info>
 }

@@ -3,6 +3,7 @@ use axum::{
     Router
 };
 use state::bitacora::Bitacora;
+use web3::stub::EthereumStub;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -15,16 +16,19 @@ pub mod web3;
 use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data };
 use storage::in_memory::InMemoryStorage;
 
-type SharedBitacora = Arc<Bitacora<InMemoryStorage>>;
+type SharedBitacora = Arc<Bitacora<InMemoryStorage, EthereumStub>>;
 
 #[tokio::main]
 async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
-    let shared_bitacora = Arc::new(Bitacora {
-        storage: InMemoryStorage::default()
-    });
+    let shared_bitacora = Arc::new(
+        Bitacora::new(
+            InMemoryStorage::default(),
+            EthereumStub::default()
+        )
+    );
 
     // build our application with a route
     let app = Router::new()

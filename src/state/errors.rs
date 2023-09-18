@@ -1,9 +1,6 @@
-pub enum NewFlightDataError {
-    DeviceNotFound,
+pub enum BitacoraError {
+    NotFound,
     AlreadyExists,
-    StorageError
-}
-
-pub enum NewDatasetError {
-    StorageError
+    StorageError,
+    Web3Error
 }

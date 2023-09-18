@@ -1,13 +1,12 @@
 use axum::{
-    http::StatusCode,
     extract::State,
     Json, response::{IntoResponse, Response}
 };
 
 use serde::{ Deserialize, Serialize };
 
-use crate::{storage::storage::{DeviceStorage, FlightDataStorage}, SharedBitacora, state::errors::NewFlightDataError};
-use crate::state::entities::{ Device, FlightData, LocalizationPoint, PublicKey };
+use crate::{ SharedBitacora, state::errors::BitacoraError};
+use crate::state::entities::{ FlightData, LocalizationPoint, };
 
 use super::errors::ErrorResponse;
 
@@ -53,9 +52,10 @@ pub async fn handler(
             dataset_id: dataset.id
         }).into_response(),
         Err(new_fd_error) => match new_fd_error {
-            NewFlightDataError::AlreadyExists => ErrorResponse::already_exists().into_response(),
-            NewFlightDataError::DeviceNotFound => ErrorResponse::not_found("Device").into_response(),
-            NewFlightDataError::StorageError => ErrorResponse::storage_error().into_response()
+            BitacoraError::AlreadyExists => ErrorResponse::already_exists().into_response(),
+            BitacoraError::NotFound => ErrorResponse::not_found("Device").into_response(),
+            BitacoraError::StorageError => ErrorResponse::storage_error().into_response(),
+            BitacoraError::Web3Error => ErrorResponse::web3_error().into_response()
         }
     }
 }

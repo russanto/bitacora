@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 
 use sha2::{Digest, Sha256};
-use tracing::info;
 
 use crate::state::entities::{Device, FlightData, Dataset, DeviceId, FlightDataId, DatasetId};
 
@@ -68,6 +67,11 @@ impl DatasetStorage for InMemoryStorage {
             },
             None => return Err(Error::InconsistentRelatedData(String::from("Dataset"), String::from("FlightData")))
         };
+        let mut write_access = self.datasets.write().unwrap();
+        match write_access.get_mut(ds_id) {
+            Some(dataset) => dataset.count += 1,
+            None => unreachable!()
+        }
         Ok(())
     }
 
@@ -78,9 +82,20 @@ impl DatasetStorage for InMemoryStorage {
         }
     }
 
-    fn set_dataset(&self, ds: &Dataset, device_id: &DeviceId) -> Result<bool, Error> {
+    fn set_dataset(&self, ds: &Dataset) -> Result<bool, Error> {
         match self.datasets.write().unwrap().insert(ds.id.clone(), ds.clone()) {
             Some(_) => Ok(true),
+            None => Ok(false)
+        }
+    }
+
+    fn add_dataset(&self, ds: &Dataset, device_id: &DeviceId) -> Result<(), Error> {
+        let mut write_lock = self.datasets.write().unwrap();
+        match write_lock.insert(ds.id.clone(), ds.clone()) {
+            Some(old_dataset) => { //a dataset already exists with such ID this is an error
+                write_lock.insert(old_dataset.id.clone(), old_dataset); // restore the old dataset
+                Err(Error::AlreadyExists)
+            },
             None => {
                 let mut write_access = self.devices_datasets.write().unwrap();
                 match write_access.get_mut(device_id) {
@@ -88,7 +103,7 @@ impl DatasetStorage for InMemoryStorage {
                     None => return Err(Error::FailedRelatingData(String::from("Dataset"), String::from("Device")))
                 }
                 self.datasets_flight_data.write().unwrap().insert(ds.id.clone(), vec![]);
-                Ok(false)
+                Ok(())
             }
         }
     }

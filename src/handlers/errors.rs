@@ -53,6 +53,17 @@ impl ErrorResponse {
             } 
         }
     }
+
+    pub fn web3_error() -> Self {
+        ErrorResponse {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            body: ErrorResponseBody {
+                code: 1004,
+                message: String::from("Error submitting a web3 transaction"),
+                description: format!("[TODO]A better description should be implemented") //TODO: improve description
+            } 
+        }
+    }
 }
 
 impl IntoResponse for ErrorResponse {
