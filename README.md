@@ -83,15 +83,25 @@ We could also design an asynchronous mechanism (e.g. a Pub/Sub) for obtaining th
 ### API definition
 The API is defined as a REST API using JSON over HTTP. It generally passes data in the messages body while configurations and options are passed as query parameters.
 
-The following list is a summary of the available resources and methods. A precise description with example requests and responses is available in the Postman collection.
+The following list is a summary of the available resources and methods. The symbol indicates the implementation status. A more precise description with example requests and responses is available in the Postman collection.
 
 - Device
-    - GET: Fetch the requested Device information
-    - POST: Create a new Device
+    - ✅ GET: Fetch the requested Device information
+    - ✅ POST: Create a new Device
 - FlightData
-    - GET: Fetch the requested FlightData information
-    - POST: Create a new FlightData
-    - PATCH: Updates an existing FlightData with full information (e.g. lightweight live data are updated with the ones downloaded after the flight)
+    - ✅ GET: Fetch the requested FlightData information
+    - ✅ POST: Create a new FlightData
+    - ❌ PATCH: Updates an existing FlightData with full information (e.g. lightweight live data are updated with the ones downloaded after the flight)
 - Dataset
-    - GET: Fetch the requested Dataset information
-    - POST: Creates a new Dataset
+    - ✅ GET: Fetch the requested Dataset information
+    - ❌ POST: Creates a new Dataset
+
+### Build and Run
+The webservice can be built using Rust 1.69. From the root directory
+```
+cargo run
+```
+will build and run using the `development` profile.
+The log level is set to `warning` by default and can be increased using the `RUST_LOG` environment variable
+
+Alternatively, Docker can be used for building and deploying; pre-configured `Dockerfile` and `docker-compose.yml` are available in the repository.
