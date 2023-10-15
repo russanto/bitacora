@@ -1,0 +1,15 @@
+{
+  "name": "bitacora_contracts",
+  "version": "0.0.1",
+  "description": "The contracts for the Bitacora subsystem of the CertiFlight platform",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "hardhat": "^2.18.1"
+  }
+}
