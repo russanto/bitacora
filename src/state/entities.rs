@@ -1,5 +1,5 @@
 use hex::FromHexError;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use sha2::{ Digest, Sha256 };
 
 use crate::web3::traits::Web3Info;
@@ -29,6 +29,7 @@ pub type DeviceId = String;
 #[derive(Clone, Debug, Serialize)]
 pub struct Device {
     pub id: DeviceId,
+    #[serde(serialize_with = "Bytes32::serialize_as_hex")]
     pub pk: PublicKey,
     pub web3: Option<Web3Info>
 }
@@ -89,12 +90,27 @@ pub struct Dataset {
     pub web3: Option<Web3Info>
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Bytes32(pub [u8; 32]);
 
 impl Bytes32 {
     pub fn to_string(&self) -> String {
         String::from(self)
+    }
+
+    pub fn serialize_as_hex<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
+    {
+        let hex_string = format!("0x{}", hex::encode(value.as_ref()));
+        serializer.serialize_str(&hex_string)
+    }
+}
+
+impl AsRef<[u8]> for Bytes32 {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 

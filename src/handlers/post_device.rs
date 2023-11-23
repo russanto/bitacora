@@ -42,7 +42,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
             POSTDeviceRequestError::FailedPKDecoding => return ErrorResponse::bad_input("pk", Some("Failed to decode")).into_response()
         }
     };
-    match state.new_device(&mut device) {
+    match state.new_device(&mut device).await {
         Ok(()) => (StatusCode::CREATED, Json(device)).into_response(),
         Err(error) => ErrorResponse::from(error).into_response()
     }

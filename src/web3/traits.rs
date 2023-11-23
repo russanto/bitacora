@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use ethers::types::H256;
 use serde::Serialize;
 
@@ -10,10 +11,11 @@ pub enum Web3Error {
     BadInputData(String)
 } 
 
+#[async_trait]
 pub trait Timestamper {
-    fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error> ;
-    fn register_dataset(&self, dataset: &Dataset, device_id: &String) -> Result<Web3Info, Web3Error>;
-    fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error>;
+    async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error> ;
+    async fn register_dataset(&self, dataset: &Dataset, device_id: &String) -> Result<Web3Info, Web3Error>;
+    async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error>;
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -39,6 +41,7 @@ impl From<TxHash> for H256 {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Tx {
+    #[serde(serialize_with = "Bytes32::serialize_as_hex")]
     pub hash: TxHash,
     pub status: TxStatus
 }

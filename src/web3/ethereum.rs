@@ -1,5 +1,6 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
+use async_trait::async_trait;
 use ethers::signers::Signer;
 use ethers::prelude::JsonRpcClient;
 use ethers::{
@@ -128,14 +129,14 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTime
     }
 }
 
+#[async_trait]
 impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper for EthereumTimestamper<M, P> {
-    fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error>  {
+    async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error>  {
         let device_response = self.contract.register_device(device.id.clone(), device.pk.0);
         
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let x = match rt.block_on(device_response.send()) {
+        let x = match device_response.send().await {
             Ok(pending_tx) => {
-                let maybe_receipt = rt.block_on(pending_tx);
+                let maybe_receipt = pending_tx.await;
                 match maybe_receipt {
                     Ok(Some(receipt)) => Ok(Web3Info {
                         blockchain: Blockchain::devnet(),
@@ -157,16 +158,15 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
         x
     }
 
-    fn register_dataset(&self, dataset: &Dataset, device_id: &String) -> Result<Web3Info, Web3Error> {
+    async fn register_dataset(&self, dataset: &Dataset, device_id: &String) -> Result<Web3Info, Web3Error> {
         if dataset.merkle_tree.is_none() {
             return Err(Web3Error::BadInputData(String::from("MerkleTree")));
         }
         let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_tree.as_ref().unwrap().root.0);
         
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let x = match rt.block_on(response.send()) {
+        let x = match response.send().await {
             Ok(pending_tx) => {
-                let maybe_receipt = rt.block_on(pending_tx);
+                let maybe_receipt = pending_tx.await;
                 match maybe_receipt {
                     Ok(Some(receipt)) => Ok(Web3Info {
                         blockchain: Blockchain::devnet(),
@@ -188,9 +188,8 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
         x
     }
 
-    fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let x = match rt.block_on(self.provider.get_transaction(web3info.tx.hash.clone())) {
+    async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {
+        let x = match self.provider.get_transaction(web3info.tx.hash.clone()).await {
             Ok(maybe_tx) => match maybe_tx {
                 Some(tx) => {
                     println!("{:?}", tx);

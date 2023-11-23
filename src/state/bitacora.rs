@@ -31,7 +31,7 @@ where
         Bitacora { storage, timestamper }
     }
 
-    pub fn new_flight_data(&self, fd: &FlightData, device_id: &DeviceId) -> Result<Dataset, BitacoraError> {
+    pub async fn new_flight_data(&self, fd: &FlightData, device_id: &DeviceId) -> Result<Dataset, BitacoraError> {
         info!("Creating a new FlightData");
         trace!(device_id = device_id, "Searching the supplied device");
         let _ = match self.storage.get_device(device_id) {
@@ -86,7 +86,7 @@ where
             Err(_) => return Err(BitacoraError::StorageError)
         }
         if dataset.count == dataset.limit {
-            self.timestamp_dataset(&mut dataset, device_id)?;
+            self.timestamp_dataset(&mut dataset, device_id).await?;
         }
         Ok(dataset)
     }
@@ -113,7 +113,7 @@ where
         }
     }
 
-    pub fn new_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
+    pub async fn new_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
         match self.storage.new_device(&device) {
             Ok(_) => (),
             Err(storage_error) => match storage_error {
@@ -121,11 +121,11 @@ where
                 _ => return Err(BitacoraError::StorageError)
             }
         };
-        self.timestamp_device(device)
+        self.timestamp_device(device).await
     }
 
-    fn timestamp_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
-        match self.timestamper.register_device(device) {
+    async fn timestamp_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
+        match self.timestamper.register_device(device).await {
             Ok(web3_info) => {
                 info!(device=device.id, tx_hash=web3_info.tx.hash.to_string(), "Device submitted to blockchain");
                 device.web3 = Some(web3_info);
@@ -138,8 +138,8 @@ where
         }
     }
 
-    fn timestamp_dataset(&self, dataset: &mut Dataset, device_id: &String) -> Result<(), BitacoraError> {
-        match self.timestamper.register_dataset(dataset, device_id) {
+    async fn timestamp_dataset(&self, dataset: &mut Dataset, device_id: &String) -> Result<(), BitacoraError> {
+        match self.timestamper.register_dataset(dataset, device_id).await {
             Ok(web3_info) => {
                 info!(dataset=dataset.id, tx_hash=web3_info.tx.hash.to_string(), "Dataset submitted to blockchain");
                 dataset.web3 = Some(web3_info);

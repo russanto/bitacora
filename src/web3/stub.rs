@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use hex;
 use sha2::{Digest, Sha256};
 
@@ -17,8 +18,9 @@ impl EthereumStub {
     }
 }
 
+#[async_trait]
 impl Timestamper for EthereumStub {
-    fn register_dataset(&self, _dataset: &Dataset, _device_id: &String) -> Result<Web3Info, Web3Error> {
+    async fn register_dataset(&self, _dataset: &Dataset, _device_id: &String) -> Result<Web3Info, Web3Error> {
         Ok(Web3Info {
             blockchain: Blockchain::ethereum(),
             tx: Tx {
@@ -28,7 +30,7 @@ impl Timestamper for EthereumStub {
         })
     }
 
-    fn register_device(&self, _device: &Device) -> Result<Web3Info, Web3Error> {
+    async fn register_device(&self, _device: &Device) -> Result<Web3Info, Web3Error> {
         Ok(Web3Info {
             blockchain: Blockchain::ethereum(),
             tx: Tx {
@@ -38,7 +40,7 @@ impl Timestamper for EthereumStub {
         })
     }
 
-    fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {
+    async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {
         let mut updated_web3 = web3info.clone();
         updated_web3.tx.status = TxStatus::Confirmed;
         Ok(updated_web3)

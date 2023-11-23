@@ -46,7 +46,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     tracing::debug!("received flight data {:?}", payload);
     let device_id = payload.device_id.clone(); //clone device id so that can move values of payload to not copy them
     let flight_data = FlightData::from(payload);
-    match state.new_flight_data(&flight_data, &device_id) {
+    match state.new_flight_data(&flight_data, &device_id).await {
         Ok(dataset) => Json(POSTFlightDataResponse {
             id: flight_data.id,
             dataset_id: dataset.id
