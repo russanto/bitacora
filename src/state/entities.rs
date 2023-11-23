@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use hex::FromHexError;
 use serde::{Deserialize, Serialize, Serializer};
 use sha2::{ Digest, Sha256 };
@@ -5,6 +7,29 @@ use sha2::{ Digest, Sha256 };
 use crate::web3::traits::Web3Info;
 
 pub const ID_BYTE_LENGTH: u8 = 16;
+
+#[derive(Clone)]
+pub enum Entity {
+    Dataset,
+    Device,
+    FlightData
+}
+
+impl Display for Entity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self.clone()))
+    }
+}
+
+impl From<Entity> for String {
+    fn from(value: Entity) -> Self {
+        match value {
+            Entity::Dataset => String::from("Dataset"),
+            Entity::Device => String::from("Device"),
+            Entity::FlightData => String::from("FlightData"),
+        }
+    }
+}
 
 pub type PublicKey = Bytes32;
 

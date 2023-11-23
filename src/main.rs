@@ -40,8 +40,8 @@ async fn main() {
         .route("/device/:id", get(get_device::handler))
         // `POST /users` goes to `create_user`
         .route("/flight_data", post(post_flight_data::handler))
-        // .route("/flight_data/:id", get(get_flight_data::handler::<SharedBitacora<InMemoryStorage, EthereumTimestamper<>>))
-        // .route("/dataset/:id", get(get_dataset::handler::<SharedBitacora>))
+        .route("/flight_data/:id", get(get_flight_data::handler))
+        .route("/dataset/:id", get(get_dataset::handler))
         .with_state(shared_bitacora);
 
     // run our app with hyper

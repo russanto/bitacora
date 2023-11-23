@@ -52,9 +52,9 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
             dataset_id: dataset.id
         }).into_response(),
         Err(new_fd_error) => match new_fd_error {
-            BitacoraError::AlreadyExists => ErrorResponse::already_exists().into_response(),
+            BitacoraError::AlreadyExists(entity, id) => ErrorResponse::already_exists(entity, id).into_response(),
             BitacoraError::NotFound => ErrorResponse::not_found("Device").into_response(),
-            BitacoraError::StorageError => ErrorResponse::storage_error().into_response(),
+            BitacoraError::StorageError(_) => ErrorResponse::storage_error().into_response(),
             BitacoraError::Web3Error => ErrorResponse::web3_error().into_response()
         }
     }

@@ -24,6 +24,7 @@ impl DeviceStorage for InMemoryStorage {
             return Err(Error::AlreadyExists);
         }
         write_lock.insert(device.id.clone(), device.clone());
+        self.devices_datasets.write().unwrap().insert(device.id.clone(), vec![]);
         Ok(())
     }
 
