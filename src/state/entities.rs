@@ -8,6 +8,23 @@ pub const ID_BYTE_LENGTH: u8 = 16;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PublicKey(pub String);
 
+impl From<[u8; 32]> for PublicKey {
+    fn from(value: [u8; 32]) -> Self {
+        let s: String = value.iter().map(|byte| format!("{:02x}", byte)).collect();
+        PublicKey(s)
+    }
+}
+
+impl From<PublicKey> for [u8; 32] {
+    fn from(value: PublicKey) -> Self {
+        let bytes = hex::decode(value.0).map_err(|_| "Invalid Hex String").unwrap();
+
+        let mut array = [0u8; 32];
+        array.copy_from_slice(&bytes);
+        array
+    }
+}
+
 pub type DeviceId = String;
 
 #[derive(Clone, Debug, Serialize)]
@@ -57,7 +74,12 @@ impl FlightData {
 
 pub type DatasetId = String;
 
-pub type MerkleTree = ();
+pub type MerkleRoot = [u8; 32];
+
+#[derive(Clone, Debug, Serialize)]
+pub struct MerkleTree {
+    pub root: MerkleRoot
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Dataset {

@@ -5,7 +5,7 @@ use axum::{
 
 use serde::{ Deserialize, Serialize };
 
-use crate::{ SharedBitacora, state::errors::BitacoraError};
+use crate::{ SharedBitacora, state::errors::BitacoraError, storage::storage::FullStorage, web3::traits::Timestamper};
 use crate::state::entities::{ FlightData, LocalizationPoint, };
 
 use super::errors::ErrorResponse;
@@ -39,8 +39,8 @@ pub struct POSTFlightDataResponse {
     pub dataset_id: String
 }
 
-pub async fn handler(
-    State(state): State<SharedBitacora>,
+pub async fn handler<S: FullStorage, T: Timestamper>(
+    State(state): State<SharedBitacora<S, T>>,
     Json(payload): Json<POSTFlightDataRequest>
 ) -> Response {
     tracing::debug!("received flight data {:?}", payload);

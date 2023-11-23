@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.19;
+pragma solidity ^0.8.0;
 
 // TODO: Add access control
 // TODO: Add handy getters
@@ -46,5 +46,9 @@ contract Bitacora {
             revert DatasetAlreadyRegistered(_id);
         device.datasets[_id] = _merkleRoot;
         emit NewDataset(_id, _deviceId, _merkleRoot);
+    }
+
+    function getDataset(string calldata _id, string calldata _deviceId) external view returns(bytes32) {
+        return devices[_deviceId].datasets[_id];
     }
 }

@@ -6,7 +6,7 @@ use axum::{
 
 use serde::Deserialize;
 
-use crate::{state::entities::{Device, PublicKey}, SharedBitacora};
+use crate::{state::entities::{Device, PublicKey}, SharedBitacora, storage::storage::FullStorage, web3::traits::Timestamper};
 
 use super::errors::ErrorResponse;
 
@@ -21,8 +21,8 @@ impl From<POSTDeviceRequest> for Device {
     }
 }
 
-pub async fn handler(
-    State(state): State<SharedBitacora>,
+pub async fn handler<S: FullStorage, T: Timestamper>(
+    State(state): State<SharedBitacora<S, T>>,
     Json(payload): Json<POSTDeviceRequest>
 ) -> Response {
     let mut device = Device::from(payload);
