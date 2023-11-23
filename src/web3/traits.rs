@@ -1,8 +1,7 @@
 use ethers::types::H256;
-use hex::FromHexError;
 use serde::Serialize;
 
-use crate::state::entities::{Device, Dataset};
+use crate::state::entities::{Bytes32, Device, Dataset};
 
 #[derive(Debug)]
 pub enum Web3Error {
@@ -24,60 +23,16 @@ pub enum TxStatus {
     Confirmed
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub struct TxHash(pub [u8; 32]);
-
-impl TxHash {
-    pub fn to_string(&self) -> String {
-        String::from(self)
-    }
-}
+pub type TxHash = Bytes32;
 
 impl From<H256> for TxHash {
     fn from(value: H256) -> Self {
-        TxHash(value.0)
-    }
-}
-
-impl From<TxHash> for String {
-    fn from(value: TxHash) -> Self {
-        String::from(&value)
-    }
-}
-
-impl From<&TxHash> for String {
-    fn from(value: &TxHash) -> Self {
-        hex::encode(value.0)
-    }
-}
-
-impl TryFrom<&str> for TxHash {
-
-    type Error = FromHexError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let value = if value.starts_with("0x") {
-            &value[2..]   
-        } else {
-            value
-        };
-        let mut bytes = [0u8; 32];
-        hex::decode_to_slice(value, &mut bytes)?;
-        Ok(TxHash(bytes))
-    }
-}
-
-impl TryFrom<String> for TxHash {
-
-    type Error = FromHexError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        TxHash::try_from(value.as_str())
+        Bytes32(value.0)
     }
 }
 
 impl From<TxHash> for H256 {
-    fn from(value: TxHash) -> Self {
+    fn from(value: Bytes32) -> Self {
         H256::from(value.0)
     }
 }

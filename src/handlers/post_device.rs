@@ -15,9 +15,20 @@ pub struct POSTDeviceRequest {
     pk: String
 }
 
-impl From<POSTDeviceRequest> for Device {
-    fn from(value: POSTDeviceRequest) -> Self {
-        Device::from(PublicKey(value.pk))
+pub enum POSTDeviceRequestError {
+    FailedPKDecoding
+}
+
+impl TryFrom<POSTDeviceRequest> for Device {
+
+    type Error = POSTDeviceRequestError;
+
+    fn try_from(value: POSTDeviceRequest) -> Result<Self, Self::Error> {
+        let pk: PublicKey = match value.pk.try_into() {
+            Ok(pk) => pk,
+            Err(_) => return Err(Self::Error::FailedPKDecoding)
+        };
+        Ok(Device::from(pk))
     }
 }
 
@@ -25,7 +36,12 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     State(state): State<SharedBitacora<S, T>>,
     Json(payload): Json<POSTDeviceRequest>
 ) -> Response {
-    let mut device = Device::from(payload);
+    let mut device = match Device::try_from(payload) {
+        Ok(device) => device,
+        Err(error) => match error {
+            POSTDeviceRequestError::FailedPKDecoding => return ErrorResponse::bad_input("pk", Some("Failed to decode")).into_response()
+        }
+    };
     match state.new_device(&mut device) {
         Ok(()) => (StatusCode::CREATED, Json(device)).into_response(),
         Err(error) => ErrorResponse::from(error).into_response()

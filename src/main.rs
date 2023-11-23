@@ -16,7 +16,7 @@ pub mod web3;
 use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data };
 use storage::{in_memory::InMemoryStorage, storage::FullStorage};
 
-type SharedBitacora<S: FullStorage, T: Timestamper> = Arc<Bitacora<S, T>>;
+type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
 
 #[tokio::main]
 async fn main() {

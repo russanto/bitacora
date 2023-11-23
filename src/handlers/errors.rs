@@ -45,6 +45,17 @@ impl ErrorResponse {
         }
     }
 
+    pub fn bad_input(parameter: &str, reason: Option<&str>) -> Self {
+        ErrorResponse {
+            status: StatusCode::BAD_REQUEST,
+            body: ErrorResponseBody {
+                code: 1003,
+                message: format!("Error on input parameter: {}", parameter),
+                description: format!("The parameter produced the following error: {}", reason.unwrap_or_default())
+            }
+        }
+    }
+
     pub fn storage_error() -> Self {
         ErrorResponse {
             status: StatusCode::INTERNAL_SERVER_ERROR,

@@ -16,7 +16,7 @@ use ethers::{
     utils::AnvilInstance
 };
 
-use crate::state::entities::{ Dataset, Device, PublicKey, MerkleTree, MerkleRoot };
+use crate::state::entities::{ Bytes32, Dataset, Device, PublicKey, MerkleTree, MerkleRoot };
 use crate::web3::traits::TxStatus;
 use super::traits::{ Timestamper, Web3Error, Web3Info, Blockchain, Tx };
 
@@ -124,13 +124,13 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTime
     pub async fn get_dataset(&self, id: String, device_id: String) -> Result<MerkleRoot, Box<dyn std::error::Error>> {
         let dataset_response = self.contract.get_dataset(id, device_id);
         let result = dataset_response.call().await?;
-        Ok(result)
+        Ok(Bytes32(result))
     }
 }
 
 impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper for EthereumTimestamper<M, P> {
     fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error>  {
-        let device_response = self.contract.register_device(device.id.clone(), device.pk.clone().into());
+        let device_response = self.contract.register_device(device.id.clone(), device.pk.0);
         
         let rt = tokio::runtime::Runtime::new().unwrap();
         let x = match rt.block_on(device_response.send()) {
@@ -161,7 +161,7 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
         if dataset.merkle_tree.is_none() {
             return Err(Web3Error::BadInputData(String::from("MerkleTree")));
         }
-        let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_tree.as_ref().unwrap().root.clone());
+        let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_tree.as_ref().unwrap().root.0);
         
         let rt = tokio::runtime::Runtime::new().unwrap();
         let x = match rt.block_on(response.send()) {
