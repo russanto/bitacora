@@ -8,7 +8,7 @@ use crate::web3::traits::Web3Info;
 
 pub const ID_BYTE_LENGTH: u8 = 16;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Entity {
     Dataset,
     Device,
@@ -77,7 +77,39 @@ pub struct LocalizationPoint {
     pub latitude: f64,
 }
 
-pub type FlightDataId = String;
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+pub struct FlightDataId(pub String);
+
+impl FlightDataId {
+    pub fn new(timestamp: u64, device_id: &str) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(timestamp.to_be_bytes());
+        hasher.update(device_id);
+        FlightDataId::from(bs58::encode(hasher.finalize()).into_string())
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.clone()
+    }
+}
+
+impl Default for FlightDataId {
+    fn default() -> Self {
+        FlightDataId(String::from(""))
+    }
+}
+
+impl From<String> for FlightDataId {
+    fn from(value: String) -> Self {
+        FlightDataId(value)
+    }
+}
+
+impl From<FlightDataId> for String {
+    fn from(value: FlightDataId) -> Self {
+        value.0
+    }
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct FlightData {
@@ -86,15 +118,6 @@ pub struct FlightData {
     pub timestamp: u64,
     pub localization: LocalizationPoint,
     pub payload: String
-}
-
-impl FlightData {
-    pub fn id(timestamp: u64, device_id: &str) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(timestamp.to_be_bytes());
-        hasher.update(device_id);
-        bs58::encode(hasher.finalize()).into_string()
-    }
 }
 
 pub type DatasetId = String;

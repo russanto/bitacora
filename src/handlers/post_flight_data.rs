@@ -5,7 +5,7 @@ use axum::{
 
 use serde::{ Deserialize, Serialize };
 
-use crate::{ SharedBitacora, state::errors::BitacoraError, storage::storage::FullStorage, web3::traits::Timestamper};
+use crate::{ SharedBitacora, state::{errors::BitacoraError, entities::FlightDataId}, storage::storage::FullStorage, web3::traits::Timestamper};
 use crate::state::entities::{ FlightData, LocalizationPoint, };
 
 use super::errors::ErrorResponse;
@@ -22,7 +22,7 @@ pub struct POSTFlightDataRequest {
 impl From<POSTFlightDataRequest> for FlightData {
     fn from(value: POSTFlightDataRequest) -> Self {
         FlightData {
-            id: FlightData::id(value.timestamp, &value.device_id),
+            id: FlightDataId::new(value.timestamp, &value.device_id),
             signature: value.signature,
             timestamp: value.timestamp,
             localization: value.localization,
@@ -48,7 +48,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     let flight_data = FlightData::from(payload);
     match state.new_flight_data(&flight_data, &device_id).await {
         Ok(dataset) => Json(POSTFlightDataResponse {
-            id: flight_data.id,
+            id: flight_data.id.into(),
             dataset_id: dataset.id
         }).into_response(),
         Err(new_fd_error) => match new_fd_error {

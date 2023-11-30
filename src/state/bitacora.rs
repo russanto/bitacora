@@ -41,12 +41,12 @@ where
             },
             Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         };
-        trace!(flight_data_id = fd.id, "Storing the FlightData");
+        trace!(flight_data_id = fd.id.to_string(), "Storing the FlightData");
         match self.storage.set_flight_data(fd) {
             Ok(already_existing) => {
                 if already_existing {
-                    warn!(flight_data_id=fd.id, "Supplied FlightData already exists");
-                    return Err(BitacoraError::AlreadyExists(Entity::FlightData, fd.id.clone()))
+                    warn!(flight_data_id=fd.id.to_string(), "Supplied FlightData already exists");
+                    return Err(BitacoraError::AlreadyExists(Entity::FlightData, fd.id.clone().into()))
                 }
             }
             Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
@@ -77,10 +77,10 @@ where
                 Err(bitacora_error) => return Err(bitacora_error)
             }
         };
-        trace!(dataset_id = dataset.id, flight_data_id = fd.id, "Adding FlightData to the Dataset");
+        trace!(dataset_id = dataset.id, flight_data_id = fd.id.to_string(), "Adding FlightData to the Dataset");
         match self.storage.add_flight_data(&dataset.id, fd) {
             Ok(_) => {
-                trace!(flight_data_id=fd.id, "Created FlightData");
+                trace!(flight_data_id=fd.id.to_string(), "Created FlightData");
                 dataset.count += 1; // to avoid reading it again
             },
             Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
