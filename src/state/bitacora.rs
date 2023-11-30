@@ -9,7 +9,7 @@ use crate::web3::traits::Timestamper;
 use super::entities::{FlightData, Device, DeviceId, Dataset, Entity, FlightDataId};
 use super::errors::BitacoraError;
 
-const DATASET_DEFAULT_LIMIT: u32 = 10;  //TODO: refactor with configuration management
+pub const DATASET_DEFAULT_LIMIT: u32 = 10;  //TODO: refactor with configuration management
 
 type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
 
