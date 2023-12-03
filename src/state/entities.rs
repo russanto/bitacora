@@ -1,10 +1,12 @@
-use std::fmt::Display;
+use std::{fmt::Display, hash};
 
 use hex::FromHexError;
 use serde::{Deserialize, Serialize, Serializer};
 use sha2::{ Digest, Sha256 };
 
-use crate::web3::traits::Web3Info;
+use crate::{web3::traits::Web3Info};
+
+use crate::common::prelude::*;
 
 pub const ID_BYTE_LENGTH: u8 = 16;
 
@@ -95,7 +97,7 @@ impl FlightDataId {
 
 impl Default for FlightDataId {
     fn default() -> Self {
-        FlightDataId(String::from(""))
+        FlightDataId(String::new())
     }
 }
 
@@ -111,6 +113,13 @@ impl From<FlightDataId> for String {
     }
 }
 
+impl AsRef<[u8]> for FlightDataId {
+    fn as_ref(&self) -> &[u8] {
+        let id_as_bytes = bs58::decode(&self.0).into_vec().unwrap();
+        &id_as_bytes
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct FlightData {
     pub id: FlightDataId,
@@ -120,81 +129,25 @@ pub struct FlightData {
     pub payload: String
 }
 
-pub type DatasetId = String;
-
-pub type MerkleRoot = Bytes32;
-
-#[derive(Clone, Debug, Serialize)]
-pub struct MerkleTree {
-    pub root: MerkleRoot
+impl AsRef<[u8]> for FlightData {
+    fn as_ref(&self) -> &[u8] {
+        let mut accumulator = Vec::new();
+        accumulator.extend_from_slice(self.id.as_ref());
+        accumulator.extend_from_slice(self.timestamp.to_be_bytes().as_slice());
+        accumulator.extend_from_slice(self.localization.latitude.to_be_bytes().as_slice());
+        accumulator.extend_from_slice(self.localization.longitude.to_be_bytes().as_slice());
+        accumulator.extend_from_slice(self.payload.as_bytes());
+        &accumulator
+    }
 }
+
+pub type DatasetId = String;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Dataset {
     pub id: DatasetId,
     pub limit: u32,
     pub count: u32,
-    pub merkle_tree: Option<MerkleTree>,
+    pub merkle_root: Option<MerkleRoot>,
     pub web3: Option<Web3Info>
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct Bytes32(pub [u8; 32]);
-
-impl Bytes32 {
-    pub fn to_string(&self) -> String {
-        String::from(self)
-    }
-
-    pub fn serialize_as_hex<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
-    {
-        let hex_string = format!("0x{}", hex::encode(value.as_ref()));
-        serializer.serialize_str(&hex_string)
-    }
-}
-
-impl AsRef<[u8]> for Bytes32 {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl From<Bytes32> for String {
-    fn from(value: Bytes32) -> Self {
-        String::from(&value)
-    }
-}
-
-impl From<&Bytes32> for String {
-    fn from(value: &Bytes32) -> Self {
-        hex::encode(value.0)
-    }
-}
-
-impl TryFrom<&str> for Bytes32 {
-
-    type Error = FromHexError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let value = if value.starts_with("0x") {
-            &value[2..]   
-        } else {
-            value
-        };
-        let mut bytes = [0u8; 32];
-        hex::decode_to_slice(value, &mut bytes)?;
-        Ok(Bytes32(bytes))
-    }
-}
-
-impl TryFrom<String> for Bytes32 {
-
-    type Error = FromHexError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Bytes32::try_from(value.as_str())
-    }
 }

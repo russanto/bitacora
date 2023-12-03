@@ -19,7 +19,9 @@ mod tests {
         solc::Solc, utils::AnvilInstance
     };
 
-    use crate::{web3::{ethereum::{new_ethereum_timestamper_from_devnode, EthereumTimestamper}, traits::Timestamper, stub::EthereumStub}, state::entities::Device, state::entities::{PublicKey, Dataset, MerkleTree, MerkleRoot}};
+    use crate::{web3::{ethereum::{new_ethereum_timestamper_from_devnode, EthereumTimestamper}, traits::Timestamper, stub::EthereumStub}, state::entities::Device, state::entities::{PublicKey, Dataset}};
+
+    use crate::common::prelude::*;
 
     #[tokio::test]
     async fn test_register_device() {
@@ -58,7 +60,7 @@ mod tests {
             id: String::from("Some Id"),
             limit: 10,
             count: 10,
-            merkle_tree: Some(MerkleTree { root: EthereumStub::get_random_tx_hash()}),
+            merkle_root: Some(EthereumStub::get_random_tx_hash()),
             web3: None
         };
 
@@ -69,7 +71,7 @@ mod tests {
             },
             Ok(_) => {
                 let gotten_merkle_root = timestamper.get_dataset(dataset.id, device.id).await.unwrap();
-                assert_eq!(gotten_merkle_root, dataset.merkle_tree.unwrap().root)
+                assert_eq!(gotten_merkle_root, dataset.merkle_root.unwrap())
             }
         }
     }

@@ -17,9 +17,11 @@ use ethers::{
     utils::AnvilInstance
 };
 
-use crate::state::entities::{ Bytes32, Dataset, Device, PublicKey, MerkleTree, MerkleRoot };
+use crate::state::entities::{Dataset, Device, PublicKey};
 use crate::web3::traits::TxStatus;
 use super::traits::{ Timestamper, Web3Error, Web3Info, Blockchain, Tx };
+
+use crate::common::prelude::*;
 
 abigen!(EthBitacoraContract, "./eth_bitacora.abi");
 
@@ -159,10 +161,10 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
     }
 
     async fn register_dataset(&self, dataset: &Dataset, device_id: &String) -> Result<Web3Info, Web3Error> {
-        if dataset.merkle_tree.is_none() {
+        if dataset.merkle_root.is_none() {
             return Err(Web3Error::BadInputData(String::from("MerkleTree")));
         }
-        let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_tree.as_ref().unwrap().root.0);
+        let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_root.unwrap().into());
         
         let x = match response.send().await {
             Ok(pending_tx) => {

@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use ethers::types::H256;
 use serde::Serialize;
 
-use crate::state::entities::{Bytes32, Device, Dataset};
+use crate::state::entities::{Device, Dataset};
+use crate::common::bytes::Bytes32;
 
 #[derive(Debug)]
 pub enum Web3Error {

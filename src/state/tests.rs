@@ -1,7 +1,6 @@
 mod tests {
     use crate::{state::{entities::{Device, PublicKey, FlightData, LocalizationPoint, FlightDataId, Dataset}, bitacora::{Bitacora, DATASET_DEFAULT_LIMIT}}, storage::in_memory::InMemoryStorage, web3::stub::EthereumStub};
 
-
     fn new_bitacora_from_stubs() -> Bitacora<InMemoryStorage, EthereumStub> {
         let storage_in_memory = InMemoryStorage::default();
         let timestamper_stub = EthereumStub::default();

@@ -8,6 +8,7 @@ use web3::{ethereum::new_ethereum_timestamper_from_devnode, traits::Timestamper}
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+pub mod common;
 pub mod handlers;
 pub mod state;
 pub mod storage;

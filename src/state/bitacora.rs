@@ -101,7 +101,7 @@ where
             id: new_id.clone(),
             limit,
             count: 0,
-            merkle_tree: None,
+            merkle_root: None,
             web3: None
         };
         match self.storage.add_dataset(&dataset, device_id) {
