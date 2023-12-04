@@ -21,7 +21,7 @@ mod tests {
                 longitude: 14.425681,
                 latitude: 40.820948
             },
-            payload: String::new()
+            payload: Vec::new()
         };
         let mut flight_datas: Vec<FlightData> = Vec::new();
 

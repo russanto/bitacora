@@ -66,17 +66,16 @@ impl <H: Hasher> MerkleTree<H> {
     }
 
     fn compute(&mut self) {
-        if self.nodes.len() == 1 {
+        let n_leaves = self.nodes.len();
+        if n_leaves == 1 {
             return;
         }
         let mut nodes_start_index = 0;
-        let mut nodes_end_index = 0;
-        let mut base_index = 0;
         let mut odd_item_index: Option<usize> = None;
         loop {
-            nodes_end_index = self.nodes.len();
+            let nodes_end_index = self.nodes.len();
             for i in 0..(nodes_end_index-nodes_start_index)/2 {
-                base_index = nodes_start_index+(i*2);
+                let base_index = nodes_start_index+(i*2);
                 self.nodes.push(
                     Self::pairwise_hash(&self.nodes[base_index], &self.nodes[base_index+1])
                 );
@@ -84,11 +83,11 @@ impl <H: Hasher> MerkleTree<H> {
             if odd_item_index.is_none() && nodes_end_index % 2 == 1 {
                 odd_item_index = Some(nodes_end_index-1);
             }
-            if nodes_end_index - nodes_start_index == 2 {
+            if nodes_end_index - nodes_start_index <= 2 {
                 if odd_item_index.is_some() {
                     self.nodes.push(
                         Self::pairwise_hash(
-                            &self.nodes[nodes_end_index],
+                            self.nodes.last().unwrap(),
                             &self.nodes[odd_item_index.unwrap()]
                         )
                     );
@@ -118,11 +117,57 @@ mod test {
 
 
     #[test]
-    fn create_merkle_tree() {
+    fn test_merkle_root_with_odd_elements() {
         let values = vec!["a", "b", "c", "d", "e"];
-        let mt = MerkleTree::<Keccak256>::new();
-        values.iter().map(|v| mt.append(v));
-        println!("{}", mt.root().unwrap());
+        let expected_root = "1dd0d2a6ae466d665cb26e1a31f07c57ae5df7d2bc559cd5826d417be9141a5d";
+        let mut mt = MerkleTree::<Keccak256>::new();
+        values.iter().for_each(|v| {
+            mt.append(v);
+        });
+        assert!(!mt.is_root_valid(), "Root is flagged as valid after tree modification");
+        assert_eq!(
+            expected_root,
+            format!("{}", mt.root().unwrap()),
+            "Computed root is not the expected one"
+        );
+        assert!(mt.is_root_valid(), "Root is flagged as invalid with no tree modification");
+        assert_eq!(mt.nodes.len(), values.len()*2-1, "Merkle Tree has more nodes than expected");       
+    }
+
+    #[test]
+    fn test_merkle_root_with_even_elements() {
+        let values = vec!["a", "b", "c", "d", "e", "f"];
+        let expected_root = "9012f1e18a87790d2e01faace75aaaca38e53df437cdce2c0552464dda4af49c";
+        let mut mt = MerkleTree::<Keccak256>::new();
+        values.iter().for_each(|v| {
+            mt.append(v);
+        });
+        assert!(!mt.is_root_valid(), "Root is flagged as valid after tree modification");
+        assert_eq!(
+            expected_root,
+            format!("{}", mt.root().unwrap()),
+            "Computed root is not the expected one"
+        );
+        assert!(mt.is_root_valid(), "Root is flagged as invalid with no tree modification");
+        assert_eq!(mt.nodes.len(), values.len()*2-1, "Merkle Tree has more nodes than expected");
+    }
+
+    #[test]
+    fn test_merkle_root_with_power_of_two_elements() {
+        let values = vec!["a", "b", "c", "d", "e", "f", "g", "h"];
+        let expected_root = "f284dc8832fbf4a18f7b7b893c69e5a5cf3961f75f31b151855acc16ea9fceb6";
+        let mut mt = MerkleTree::<Keccak256>::new();
+        values.iter().for_each(|v| {
+            mt.append(v);
+        });
+        assert!(!mt.is_root_valid(), "Root is flagged as valid after tree modification");
+        assert_eq!(
+            expected_root,
+            format!("{}", mt.root().unwrap()),
+            "Computed root is not the expected one"
+        );
+        assert!(mt.is_root_valid(), "Root is flagged as invalid with no tree modification");
+        assert_eq!(mt.nodes.len(), values.len()*2-1, "Merkle Tree has more nodes than expected");
     }
     
 }
