@@ -7,5 +7,6 @@ pub enum BitacoraError {
     NotFound,
     AlreadyExists(Entity, String),
     StorageError(Error),
-    Web3Error
+    Web3Error,
+    BadIdFormat
 }

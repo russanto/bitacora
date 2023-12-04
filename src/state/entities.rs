@@ -1,5 +1,6 @@
 use std::{fmt::Display, hash};
 
+use ethers::utils::keccak256;
 use hex::FromHexError;
 use serde::{Deserialize, Serialize, Serializer};
 use sha2::{ Digest, Sha256 };
@@ -8,7 +9,10 @@ use crate::{web3::traits::Web3Info};
 
 use crate::common::prelude::*;
 
+use super::errors::BitacoraError;
+
 pub const ID_BYTE_LENGTH: u8 = 16;
+pub const FLIGHT_DATA_ID_PREFIX: u8 = 1;
 
 #[derive(Clone, Debug)]
 pub enum Entity {
@@ -80,43 +84,57 @@ pub struct LocalizationPoint {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
-pub struct FlightDataId(pub String);
+pub struct FlightDataId(Bytes32);
 
 impl FlightDataId {
     pub fn new(timestamp: u64, device_id: &str) -> Self {
         let mut hasher = Sha256::new();
+        hasher.update(FLIGHT_DATA_ID_PREFIX.to_be_bytes());
         hasher.update(timestamp.to_be_bytes());
         hasher.update(device_id);
-        FlightDataId::from(bs58::encode(hasher.finalize()).into_string())
+        FlightDataId(hasher.finalize().into())
     }
 
     pub fn to_string(&self) -> String {
-        self.0.clone()
+        bs58::encode(&self.0).into_string()
+    }
+
+    pub fn to_hex_string(&self) -> String {
+        hex::encode(&self.0)
     }
 }
 
 impl Default for FlightDataId {
     fn default() -> Self {
-        FlightDataId(String::new())
+        FlightDataId(Bytes32::default())
     }
 }
 
-impl From<String> for FlightDataId {
-    fn from(value: String) -> Self {
-        FlightDataId(value)
+impl TryFrom<String> for FlightDataId {
+    type Error = BitacoraError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match bs58::decode(value).into_vec() {
+            Ok(id_bytes) => {
+                if id_bytes.len() != 32 {
+                    return Err(BitacoraError::BadIdFormat);
+                }
+                Ok(FlightDataId(id_bytes.try_into().unwrap()))
+            },
+            Err(_) => Err(BitacoraError::BadIdFormat)
+        }
     }
 }
 
 impl From<FlightDataId> for String {
     fn from(value: FlightDataId) -> Self {
-        value.0
+        value.to_string()
     }
 }
 
 impl AsRef<[u8]> for FlightDataId {
     fn as_ref(&self) -> &[u8] {
-        let id_as_bytes = bs58::decode(&self.0).into_vec().unwrap();
-        &id_as_bytes
+        self.0.as_ref()
     }
 }
 
@@ -126,18 +144,18 @@ pub struct FlightData {
     pub signature: String,
     pub timestamp: u64,
     pub localization: LocalizationPoint,
-    pub payload: String
+    pub payload: Vec<u8>
 }
 
-impl AsRef<[u8]> for FlightData {
-    fn as_ref(&self) -> &[u8] {
+impl FlightData {
+    pub fn to_bytes(&self) -> Vec<u8> {
         let mut accumulator = Vec::new();
         accumulator.extend_from_slice(self.id.as_ref());
         accumulator.extend_from_slice(self.timestamp.to_be_bytes().as_slice());
         accumulator.extend_from_slice(self.localization.latitude.to_be_bytes().as_slice());
         accumulator.extend_from_slice(self.localization.longitude.to_be_bytes().as_slice());
-        accumulator.extend_from_slice(self.payload.as_bytes());
-        &accumulator
+        accumulator.extend(&self.payload);
+        accumulator
     }
 }
 

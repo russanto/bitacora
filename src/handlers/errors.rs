@@ -90,7 +90,8 @@ impl From<BitacoraError> for ErrorResponse {
             BitacoraError::AlreadyExists(entity, id) => ErrorResponse::already_exists(entity, id),
             BitacoraError::Web3Error => ErrorResponse::web3_error(),
             BitacoraError::NotFound => ErrorResponse::not_found(&String::from("CHANGE ME")),
-            BitacoraError::StorageError(_) => ErrorResponse::storage_error()
+            BitacoraError::StorageError(_) => ErrorResponse::storage_error(),
+            BitacoraError::BadIdFormat => ErrorResponse::bad_input("id", None)
         }
     }
 }

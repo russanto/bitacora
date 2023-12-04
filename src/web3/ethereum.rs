@@ -164,7 +164,7 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
         if dataset.merkle_root.is_none() {
             return Err(Web3Error::BadInputData(String::from("MerkleTree")));
         }
-        let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_root.unwrap().into());
+        let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_root.clone().unwrap().into());
         
         let x = match response.send().await {
             Ok(pending_tx) => {

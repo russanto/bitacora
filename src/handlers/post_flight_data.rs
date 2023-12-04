@@ -3,6 +3,7 @@ use axum::{
     Json, response::{IntoResponse, Response}
 };
 
+use base64::{DecodeError, Engine as _, engine::general_purpose::STANDARD_NO_PAD};
 use serde::{ Deserialize, Serialize };
 
 use crate::{ SharedBitacora, state::{errors::BitacoraError, entities::FlightDataId}, storage::storage::FullStorage, web3::traits::Timestamper};
@@ -19,17 +20,29 @@ pub struct POSTFlightDataRequest {
     signature: String
 }
 
-impl From<POSTFlightDataRequest> for FlightData {
-    fn from(value: POSTFlightDataRequest) -> Self {
-        FlightData {
+pub enum InputFlightDataError {
+    BadPayloadData(DecodeError)
+}
+
+impl TryFrom<POSTFlightDataRequest> for FlightData {
+
+    type Error = InputFlightDataError;
+    
+    fn try_from(value: POSTFlightDataRequest) -> Result<Self, Self::Error> {
+        let payload = match STANDARD_NO_PAD.decode(value.payload) {
+            Ok(payload) => payload,
+            Err(err) => return Err(InputFlightDataError::BadPayloadData(err))
+        };
+        Ok(FlightData {
             id: FlightDataId::new(value.timestamp, &value.device_id),
             signature: value.signature,
             timestamp: value.timestamp,
             localization: value.localization,
-            payload: value.payload,
-        }
+            payload,
+        })
         // TODO: add parameters validation
         // TODO: add FlightData validation
+   
     }
 }
 
@@ -45,7 +58,12 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
 ) -> Response {
     tracing::debug!("received flight data {:?}", payload);
     let device_id = payload.device_id.clone(); //clone device id so that can move values of payload to not copy them
-    let flight_data = FlightData::from(payload);
+    let flight_data = match FlightData::try_from(payload) {
+        Ok(fd) => fd,
+        Err(err) => match err {
+            InputFlightDataError::BadPayloadData(_) => return ErrorResponse::bad_input("payload", None).into_response()
+        }
+    };
     match state.new_flight_data(&flight_data, &device_id).await {
         Ok(dataset) => Json(POSTFlightDataResponse {
             id: flight_data.id.into(),
@@ -55,7 +73,8 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
             BitacoraError::AlreadyExists(entity, id) => ErrorResponse::already_exists(entity, id).into_response(),
             BitacoraError::NotFound => ErrorResponse::not_found("Device").into_response(),
             BitacoraError::StorageError(_) => ErrorResponse::storage_error().into_response(),
-            BitacoraError::Web3Error => ErrorResponse::web3_error().into_response()
+            BitacoraError::Web3Error => ErrorResponse::web3_error().into_response(),
+            BitacoraError::BadIdFormat => ErrorResponse::bad_input("device_id", Some("Bad Device Id")).into_response() //this should be unreachable
         }
     }
 }

@@ -1,9 +1,12 @@
-use std::fmt::Display;
+use std::{convert::TryInto, fmt::Display};
 
 use hex::FromHexError;
 use serde::{Serialize, Serializer};
+use sha2::digest::{generic_array::GenericArray, typenum::U32};
 
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize)]
+use crate::handlers::errors::Error;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Serialize)]
 pub struct Bytes32(pub [u8; 32]);
 
 impl Bytes32 {
@@ -67,6 +70,33 @@ impl TryFrom<String> for Bytes32 {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Bytes32::try_from(value.as_str())
+    }
+}
+
+impl From<GenericArray<u8, U32>> for Bytes32 {
+    fn from(value: GenericArray<u8, U32>) -> Self {
+        value.into()
+    }
+}
+
+#[derive(Debug)]
+pub struct BadArrayLength(usize);
+
+impl TryFrom<Vec<u8>> for Bytes32 {
+
+    type Error = BadArrayLength;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        match value.try_into() {
+            Ok(r) => Ok(Bytes32(r)),
+            Err(err) => Err(BadArrayLength(err.len()))
+        }
+    }
+}
+
+impl Default for Bytes32 {
+    fn default() -> Self {
+        Bytes32([0u8; 32])
     }
 }
 
