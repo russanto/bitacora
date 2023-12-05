@@ -1,4 +1,4 @@
-use std::{convert::TryInto, fmt::Display};
+use std::{convert::TryInto, fmt::Debug, fmt::Display};
 
 use hex::FromHexError;
 use serde::{Serialize, Serializer};
@@ -6,7 +6,7 @@ use sha2::digest::{generic_array::GenericArray, typenum::U32};
 
 use crate::handlers::errors::Error;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Eq, Hash, PartialEq, PartialOrd, Serialize)]
 pub struct Bytes32(pub [u8; 32]);
 
 impl Bytes32 {
@@ -101,6 +101,12 @@ impl Default for Bytes32 {
 }
 
 impl Display for Bytes32 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self))
+    }
+}
+
+impl Debug for Bytes32 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from(self))
     }
