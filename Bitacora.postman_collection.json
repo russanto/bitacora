@@ -339,7 +339,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"pk\": \"this is the public key\" //the base64 encoding of the public key\n}",
+					"raw": "{\n    \"pk\": \"0x1234567890123456789012345678901234567890123456789012345678901234\" //the base64 encoding of the public key\n}",
 					"options": {
 						"raw": {
 							"language": "json"
