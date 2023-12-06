@@ -21,6 +21,7 @@ pub trait DatasetStorage {
     fn get_dataset(&self, id: &DatasetId) -> Result<Option<Dataset>, Error>;
     fn get_latest_dataset(&self, device_id: &DeviceId) -> Result<Option<Dataset>, Error>;
     fn add_flight_data(&self, ds_id: &DatasetId, fd: &FlightData) -> Result<(), Error>;
+    fn get_dataset_flight_data(&self, ds_id: &DatasetId) -> Result<Vec<FlightData>, Error>;
     fn new_dataset_id(&self) -> Result<DatasetId, Error>;
 }
 

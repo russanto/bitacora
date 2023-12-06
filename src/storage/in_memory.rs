@@ -85,6 +85,20 @@ impl DatasetStorage for InMemoryStorage {
         Ok(())
     }
 
+    fn get_dataset_flight_data(&self, ds_id: &DatasetId) -> Result<Vec<FlightData>, Error> {
+        let read_access_cross_ds_fd = self.datasets_flight_data.read().unwrap();
+        let read_access_fds = self.fligth_data.read().unwrap();
+        let fd_ids = match read_access_cross_ds_fd.get(ds_id) {
+            Some(fd_ids) => fd_ids,
+            None => return Err(Error::NotFound(String::from("Dataset")))
+        };
+        let mut fds = Vec::new();
+        for fd_id in fd_ids {
+            fds.push(read_access_fds.get(fd_id).unwrap().clone());
+        }
+        Ok(fds)
+    }
+
     fn get_dataset(&self, id: &DatasetId) -> Result<Option<Dataset>, Error> {
         match self.datasets.read().unwrap().get(id) {
             Some(dataset) => Ok(Some(dataset.clone())),

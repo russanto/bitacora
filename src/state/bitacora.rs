@@ -2,14 +2,16 @@ use std::sync::Arc;
 
 use tracing::{warn, info, debug, trace};
 
+use crate::common::merkle::Keccak256;
+use crate::common::prelude::MerkleTree;
 use crate::storage::errors::Error as StorageError;
 use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
 use crate::web3::traits::Timestamper;
 
-use super::entities::{FlightData, Device, DeviceId, Dataset, FlightDataId};
+use super::entities::{FlightData, Device, DeviceId, Dataset, Entity, FlightDataId};
 use super::errors::BitacoraError;
 
-const DATASET_DEFAULT_LIMIT: u32 = 10;  //TODO: refactor with configuration management
+pub const DATASET_DEFAULT_LIMIT: u32 = 10;  //TODO: refactor with configuration management
 
 type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
 
@@ -31,7 +33,7 @@ where
         Bitacora { storage, timestamper }
     }
 
-    pub fn new_flight_data(&self, fd: &FlightData, device_id: &DeviceId) -> Result<Dataset, BitacoraError> {
+    pub async fn new_flight_data(&self, fd: &FlightData, device_id: &DeviceId) -> Result<Dataset, BitacoraError> {
         info!("Creating a new FlightData");
         trace!(device_id = device_id, "Searching the supplied device");
         let _ = match self.storage.get_device(device_id) {
@@ -39,17 +41,17 @@ where
                 Some(device) => device,
                 None => return Err(BitacoraError::NotFound)
             },
-            Err(_) => return Err(BitacoraError::StorageError)
+            Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         };
-        trace!(flight_data_id = fd.id, "Storing the FlightData");
+        trace!(flight_data_id = fd.id.to_string(), "Storing the FlightData");
         match self.storage.set_flight_data(fd) {
             Ok(already_existing) => {
                 if already_existing {
-                    warn!(flight_data_id=fd.id, "Supplied FlightData already exists");
-                    return Err(BitacoraError::AlreadyExists)
+                    warn!(flight_data_id=fd.id.to_string(), "Supplied FlightData already exists");
+                    return Err(BitacoraError::AlreadyExists(Entity::FlightData, fd.id.clone().into()))
                 }
             }
-            Err(_) => return Err(BitacoraError::StorageError)
+            Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         };
         trace!(device_id = device_id, "Getting the latest dataset");
         let dataset = match self.storage.get_latest_dataset(device_id) {
@@ -67,26 +69,35 @@ where
                     None
                 }
             },
-            Err(_) => return Err(BitacoraError::StorageError)
+            Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         };
         let mut dataset = match dataset {
             Some(ds) => ds,
             None => match self.new_dataset(DATASET_DEFAULT_LIMIT, device_id) {
                 Ok(new_dataset) => new_dataset,
                 //TODO handle failure here (FlightData has no Dataset)
-                Err(_) => return Err(BitacoraError::StorageError)
+                Err(bitacora_error) => return Err(bitacora_error)
             }
         };
-        trace!(dataset_id = dataset.id, flight_data_id = fd.id, "Adding FlightData to the Dataset");
+        trace!(dataset_id = dataset.id, flight_data_id = fd.id.to_string(), "Adding FlightData to the Dataset");
         match self.storage.add_flight_data(&dataset.id, fd) {
             Ok(_) => {
-                trace!(flight_data_id=fd.id, "Created FlightData");
+                trace!(flight_data_id=fd.id.to_string(), "Created FlightData");
                 dataset.count += 1; // to avoid reading it again
             },
-            Err(_) => return Err(BitacoraError::StorageError)
+            Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         }
         if dataset.count == dataset.limit {
-            self.timestamp_dataset(&mut dataset)?;
+            let fds = match self.storage.get_dataset_flight_data(&dataset.id) {
+                Ok(fds) => fds,
+                Err(err) => return Err(BitacoraError::StorageError(err))
+            };
+            let mut fd_mt = MerkleTree::<Keccak256>::new();
+            for fd in fds {
+                fd_mt.append(&fd.to_bytes());
+            }
+            dataset.merkle_root = fd_mt.root().cloned();
+            self.timestamp_dataset(&mut dataset, device_id).await?;
         }
         Ok(dataset)
     }
@@ -95,13 +106,13 @@ where
         trace!(device_id=device_id, "Creating new Dataset");
         let new_id = match self.storage.new_dataset_id() {
             Ok(id) => id,
-            Err(_) => return Err(BitacoraError::StorageError)
+            Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         };
         let dataset = Dataset {
             id: new_id.clone(),
             limit,
             count: 0,
-            merkle_tree: None,
+            merkle_root: None,
             web3: None
         };
         match self.storage.add_dataset(&dataset, device_id) {
@@ -109,43 +120,46 @@ where
                 trace!(dataset_id=new_id, device_id=device_id, "Created Dataset");
                 Ok(dataset)
             }, 
-            Err(_) => Err(BitacoraError::StorageError)
+            Err(storage_error) => match storage_error {
+                StorageError::AlreadyExists => return Err(BitacoraError::AlreadyExists(Entity::Dataset, dataset.id)),
+                _ => return Err(BitacoraError::StorageError(storage_error))
+            }
         }
     }
 
-    pub fn new_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
+    pub async fn new_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
         match self.storage.new_device(&device) {
             Ok(_) => (),
             Err(storage_error) => match storage_error {
-                StorageError::AlreadyExists => return Err(BitacoraError::StorageError),
-                _ => return Err(BitacoraError::StorageError)
+                StorageError::AlreadyExists => return Err(BitacoraError::AlreadyExists(Entity::Device, device.id.clone())),
+                _ => return Err(BitacoraError::StorageError(storage_error))
             }
         };
-        self.timestamp_device(device)
+        self.timestamp_device(device).await
     }
 
-    fn timestamp_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
-        match self.timestamper.register_device(device) {
+    async fn timestamp_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
+        match self.timestamper.register_device(device).await {
             Ok(web3_info) => {
-                info!(device=device.id, tx_hash=web3_info.tx.hash, "Device submitted to blockchain");
+                info!(device=device.id, tx_hash=web3_info.tx.hash.to_string(), "Device submitted to blockchain");
                 device.web3 = Some(web3_info);
                 match self.storage.set_device(device) {
                     Ok(_) => Ok(()),
-                    Err(_) => Err(BitacoraError::StorageError)
+                    Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
                 }
             },
             Err(_) => Err(BitacoraError::Web3Error)
         }
     }
 
-    fn timestamp_dataset(&self, dataset: &mut Dataset) -> Result<(), BitacoraError> {
-        match self.timestamper.register_dataset(dataset) {
+    async fn timestamp_dataset(&self, dataset: &mut Dataset, device_id: &String) -> Result<(), BitacoraError> {
+        match self.timestamper.register_dataset(dataset, device_id).await {
             Ok(web3_info) => {
-                info!(dataset=dataset.id, tx_hash=web3_info.tx.hash, "Dataset submitted to blockchain");
+                info!(dataset=dataset.id, tx_hash=web3_info.tx.hash.to_string(), "Dataset submitted to blockchain");
                 dataset.web3 = Some(web3_info);
                 match self.storage.set_dataset(dataset) {
                     Ok(_) => Ok(()),
-                    Err(_) => Err(BitacoraError::StorageError)
+                    Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
                 }
             },
             Err(_) => Err(BitacoraError::Web3Error)
@@ -180,6 +194,10 @@ impl <S: FullStorage, T: Timestamper> DeviceStorage for SharedBitacora<S, T> {
 impl <S: FullStorage, T: Timestamper> DatasetStorage for SharedBitacora<S, T> {
     fn add_flight_data(&self, ds_id: &super::entities::DatasetId, fd: &FlightData) -> Result<(), crate::storage::errors::Error> {
         self.storage.add_flight_data(ds_id, fd)
+    }
+
+    fn get_dataset_flight_data(&self, ds_id: &super::entities::DatasetId) -> Result<Vec<FlightData>, StorageError> {
+        self.storage.get_dataset_flight_data(ds_id)
     }
 
     fn add_dataset(&self, ds: &Dataset, device_id: &DeviceId) -> Result<(), crate::storage::errors::Error> {

@@ -1,7 +1,7 @@
 use axum::{http::StatusCode, Json, response::IntoResponse};
 use serde::Serialize;
 
-use crate::state::errors::BitacoraError;
+use crate::state::{errors::BitacoraError, entities::Entity};
 
 
 #[derive(Debug)]
@@ -22,14 +22,13 @@ pub struct ErrorResponseBody {
 }
 
 impl ErrorResponse {
-    pub fn already_exists() -> Self {
+    pub fn already_exists(entity: Entity, id: String) -> Self {
         ErrorResponse {
             status: StatusCode::BAD_REQUEST,
             body: ErrorResponseBody {
                 code: 1001,
-                message: String::from("Resource already exists"),
-                description: String::from("The resource you are trying to create already exists, or \
-                                            clashes with the Id of an existing resource")
+                message: format!("{} already exists", entity),
+                description: format!("Resource {} already exists", id)
             }
         }
     }
@@ -42,6 +41,17 @@ impl ErrorResponse {
                 message: String::from("Resource not found"),
                 description: format!("The following resorce was not found: {}", what)
             } 
+        }
+    }
+
+    pub fn bad_input(parameter: &str, reason: Option<&str>) -> Self {
+        ErrorResponse {
+            status: StatusCode::BAD_REQUEST,
+            body: ErrorResponseBody {
+                code: 1003,
+                message: format!("Error on input parameter: {}", parameter),
+                description: format!("The parameter produced the following error: {}", reason.unwrap_or_default())
+            }
         }
     }
 
@@ -77,10 +87,11 @@ impl IntoResponse for ErrorResponse {
 impl From<BitacoraError> for ErrorResponse {
     fn from(value: BitacoraError) -> Self {
         match value {
-            BitacoraError::AlreadyExists => ErrorResponse::already_exists(),
+            BitacoraError::AlreadyExists(entity, id) => ErrorResponse::already_exists(entity, id),
             BitacoraError::Web3Error => ErrorResponse::web3_error(),
             BitacoraError::NotFound => ErrorResponse::not_found(&String::from("CHANGE ME")),
-            BitacoraError::StorageError => ErrorResponse::storage_error()
+            BitacoraError::StorageError(_) => ErrorResponse::storage_error(),
+            BitacoraError::BadIdFormat => ErrorResponse::bad_input("id", None)
         }
     }
 }

@@ -3,30 +3,33 @@ use axum::{
     Router
 };
 use state::bitacora::Bitacora;
-use web3::stub::EthereumStub;
+use web3::{ethereum::new_ethereum_timestamper_from_devnode, traits::Timestamper};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+pub mod common;
 pub mod handlers;
 pub mod state;
 pub mod storage;
 pub mod web3;
 
 use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data };
-use storage::in_memory::InMemoryStorage;
+use storage::{in_memory::InMemoryStorage, storage::FullStorage};
 
-type SharedBitacora = Arc<Bitacora<InMemoryStorage, EthereumStub>>;
+type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
 
 #[tokio::main]
 async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
+    let (timestamper, _anvil) = new_ethereum_timestamper_from_devnode().await;
+
     let shared_bitacora = Arc::new(
         Bitacora::new(
             InMemoryStorage::default(),
-            EthereumStub::default()
+            timestamper
         )
     );
 
@@ -38,8 +41,8 @@ async fn main() {
         .route("/device/:id", get(get_device::handler))
         // `POST /users` goes to `create_user`
         .route("/flight_data", post(post_flight_data::handler))
-        .route("/flight_data/:id", get(get_flight_data::handler::<SharedBitacora>))
-        .route("/dataset/:id", get(get_dataset::handler::<SharedBitacora>))
+        .route("/flight_data/:id", get(get_flight_data::handler))
+        .route("/dataset/:id", get(get_dataset::handler))
         .with_state(shared_bitacora);
 
     // run our app with hyper
