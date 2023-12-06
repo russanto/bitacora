@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use tracing::{warn, info, debug, trace};
 
+use crate::common::merkle::Keccak256;
+use crate::common::prelude::MerkleTree;
 use crate::storage::errors::Error as StorageError;
 use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
 use crate::web3::traits::Timestamper;
@@ -86,6 +88,15 @@ where
             Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         }
         if dataset.count == dataset.limit {
+            let fds = match self.storage.get_dataset_flight_data(&dataset.id) {
+                Ok(fds) => fds,
+                Err(err) => return Err(BitacoraError::StorageError(err))
+            };
+            let mut fd_mt = MerkleTree::<Keccak256>::new();
+            for fd in fds {
+                fd_mt.append(&fd.to_bytes());
+            }
+            dataset.merkle_root = fd_mt.root().cloned();
             self.timestamp_dataset(&mut dataset, device_id).await?;
         }
         Ok(dataset)
@@ -183,6 +194,10 @@ impl <S: FullStorage, T: Timestamper> DeviceStorage for SharedBitacora<S, T> {
 impl <S: FullStorage, T: Timestamper> DatasetStorage for SharedBitacora<S, T> {
     fn add_flight_data(&self, ds_id: &super::entities::DatasetId, fd: &FlightData) -> Result<(), crate::storage::errors::Error> {
         self.storage.add_flight_data(ds_id, fd)
+    }
+
+    fn get_dataset_flight_data(&self, ds_id: &super::entities::DatasetId) -> Result<Vec<FlightData>, StorageError> {
+        self.storage.get_dataset_flight_data(ds_id)
     }
 
     fn add_dataset(&self, ds: &Dataset, device_id: &DeviceId) -> Result<(), crate::storage::errors::Error> {

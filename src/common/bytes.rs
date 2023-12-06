@@ -75,7 +75,9 @@ impl TryFrom<String> for Bytes32 {
 
 impl From<GenericArray<u8, U32>> for Bytes32 {
     fn from(value: GenericArray<u8, U32>) -> Self {
-        value.into()
+        let mut result = Bytes32::default();
+        result.0.copy_from_slice(value.as_slice());
+        result
     }
 }
 
