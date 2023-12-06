@@ -3,7 +3,7 @@ use axum::{
     Json, response::{IntoResponse, Response}
 };
 
-use base64::{DecodeError, Engine as _, engine::general_purpose::STANDARD_NO_PAD};
+use base64::{DecodeError, Engine as _, engine::general_purpose::STANDARD};
 use serde::{ Deserialize, Serialize };
 
 use crate::{ SharedBitacora, state::{errors::BitacoraError, entities::FlightDataId}, storage::storage::FullStorage, web3::traits::Timestamper};
@@ -29,7 +29,7 @@ impl TryFrom<POSTFlightDataRequest> for FlightData {
     type Error = InputFlightDataError;
     
     fn try_from(value: POSTFlightDataRequest) -> Result<Self, Self::Error> {
-        let payload = match STANDARD_NO_PAD.decode(value.payload) {
+        let payload = match STANDARD.decode(value.payload) {
             Ok(payload) => payload,
             Err(err) => return Err(InputFlightDataError::BadPayloadData(err))
         };
@@ -61,7 +61,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     let flight_data = match FlightData::try_from(payload) {
         Ok(fd) => fd,
         Err(err) => match err {
-            InputFlightDataError::BadPayloadData(_) => return ErrorResponse::bad_input("payload", None).into_response()
+            InputFlightDataError::BadPayloadData(err) => return ErrorResponse::bad_input("payload", Some(&err.to_string())).into_response()
         }
     };
     match state.new_flight_data(&flight_data, &device_id).await {

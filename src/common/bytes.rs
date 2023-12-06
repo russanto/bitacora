@@ -4,9 +4,7 @@ use hex::FromHexError;
 use serde::{Serialize, Serializer};
 use sha2::digest::{generic_array::GenericArray, typenum::U32};
 
-use crate::handlers::errors::Error;
-
-#[derive(Clone, Eq, Hash, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Eq, Hash, PartialEq, PartialOrd)]
 pub struct Bytes32(pub [u8; 32]);
 
 impl Bytes32 {
@@ -21,6 +19,15 @@ impl Bytes32 {
     {
         let hex_string = format!("0x{}", hex::encode(value.as_ref()));
         serializer.serialize_str(&hex_string)
+    }
+}
+
+impl Serialize for Bytes32 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Self::serialize_as_hex(self, serializer)
     }
 }
 
