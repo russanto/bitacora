@@ -1,6 +1,4 @@
 /target
 
-*.abi
-
 .DS_Store
 .vscode/settings.json
