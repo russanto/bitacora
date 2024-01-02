@@ -2,12 +2,14 @@ use axum::{
     routing::{get, post},
     Router
 };
+use clap::Parser;
 use state::bitacora::Bitacora;
-use web3::{ethereum::new_ethereum_timestamper_from_devnode, traits::Timestamper};
+use web3::{ethereum::new_ethereum_timestamper_from_url, traits::Timestamper};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+pub mod cli_args;
 pub mod common;
 pub mod handlers;
 pub mod state;
@@ -24,7 +26,10 @@ async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
-    let (timestamper, _anvil) = new_ethereum_timestamper_from_devnode().await;
+    // cli params
+    let args = cli_args::CLIArgs::parse();
+
+    let timestamper = new_ethereum_timestamper_from_url(&args.web3).await.unwrap();
 
     let shared_bitacora = Arc::new(
         Bitacora::new(

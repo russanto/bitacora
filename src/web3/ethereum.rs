@@ -6,6 +6,7 @@ use ethers::prelude::JsonRpcClient;
 use ethers::{
     contract::{ abigen, ContractFactory },
     core::{
+        rand::thread_rng,
         types::Address,
         k256::ecdsa::SigningKey,
         utils::Anvil,
@@ -115,6 +116,45 @@ pub async fn new_ethereum_timestamper_from_devnode() -> (EthereumTimestamper<Arc
         panic!("Error creating timestamp");
     }
     (timestamper.unwrap(), anvil)
+}
+
+pub async fn new_ethereum_timestamper_from_url(url: &str) -> Result<EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>, Web3Error> {
+
+    let contract_path = Path::new(&env!("CARGO_MANIFEST_DIR")).join("contracts/contracts/Bitacora.sol");
+    
+    let compiled = Solc::default().compile_source(contract_path).unwrap();
+
+    let (abi, bytecode, _runtime_bytecode) = compiled.find("Bitacora").expect("could not find contract").into_parts_or_default();
+
+    // 2. instantiate wallet
+    let wallet: LocalWallet = LocalWallet::new(&mut thread_rng());
+    // 3. connect to the network
+    let provider = Provider::<Http>::try_from(url).unwrap().interval(Duration::from_millis(10u64));
+    let chain_id = match provider.get_chainid().await {
+        Ok(chain_id) => chain_id,
+        Err(_) => return Err(Web3Error::ProviderConnectionFailed)
+    };
+
+    // 4. instantiate the client with the wallet
+    let client = SignerMiddleware::new(provider, wallet.with_chain_id(chain_id.as_u64()));
+    let client = Arc::new(client);
+
+    // 5. create a factory which will be used to deploy instances of the contract
+    let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), client.clone());
+
+    // 6. deploy it with the constructor arguments
+    let contract = factory.deploy(()).unwrap().send().await.unwrap();
+
+    let provider = Provider::<Http>::try_from(url).unwrap().interval(Duration::from_millis(10u64));
+    let timestamper = new_ethereum_timestamper(
+        client,
+        provider,
+        hex::encode(contract.address()).as_str(),
+    );
+    if timestamper.is_err() {
+        panic!("Error creating timestamp");
+    }
+    Ok(timestamper.unwrap())
 }
 
 impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTimestamper<M, P>{

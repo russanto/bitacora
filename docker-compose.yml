@@ -1,9 +1,15 @@
 version: '3'
 services:
-    webservice:
+    bitacora:
         image: bitacora
         build: .
         environment:
             - RUST_LOG=info
         ports:
             - 3000:3000
+        command: ["--web3", "http://web3:8545"]
+    web3:
+        image: ghcr.io/foundry-rs/foundry:latest
+        ports:
+            - 8545:8545
+        command: ["anvil"]
