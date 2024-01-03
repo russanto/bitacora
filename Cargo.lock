@@ -492,6 +492,7 @@ dependencies = [
  "ethers",
  "foundry-compilers",
  "hex",
+ "once_cell",
  "rand",
  "serde",
  "serde_json",
