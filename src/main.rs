@@ -4,13 +4,14 @@ use axum::{
 };
 use clap::Parser;
 use state::bitacora::Bitacora;
-use web3::{ethereum::new_ethereum_timestamper_from_url, traits::Timestamper};
+use web3::{ethereum::new_ethereum_timestamper_from_url_with_sk, traits::Timestamper};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 pub mod cli_args;
 pub mod common;
+pub mod configuration;
 pub mod handlers;
 pub mod state;
 pub mod storage;
@@ -28,8 +29,9 @@ async fn main() {
 
     // cli params
     let args = cli_args::CLIArgs::parse();
+    configuration::BitacoraConfiguration::from_cli_args(&args);
 
-    let timestamper = new_ethereum_timestamper_from_url(&args.web3).await.unwrap();
+    let timestamper = new_ethereum_timestamper_from_url_with_sk(&args.web3, &args.private_key).await.unwrap();
 
     let shared_bitacora = Arc::new(
         Bitacora::new(

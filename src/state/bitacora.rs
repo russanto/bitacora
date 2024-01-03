@@ -73,10 +73,13 @@ where
         };
         let mut dataset = match dataset {
             Some(ds) => ds,
-            None => match self.new_dataset(DATASET_DEFAULT_LIMIT, device_id) {
-                Ok(new_dataset) => new_dataset,
-                //TODO handle failure here (FlightData has no Dataset)
-                Err(bitacora_error) => return Err(bitacora_error)
+            None => {
+                let dataset_default_count = configuration::BitacoraConfiguration::get_dataset_default_count();
+                match self.new_dataset(dataset_default_count, device_id) {
+                    Ok(new_dataset) => new_dataset,
+                    //TODO handle failure here (FlightData has no Dataset)
+                    Err(bitacora_error) => return Err(bitacora_error)
+                }
             }
         };
         trace!(dataset_id = dataset.id, flight_data_id = fd.id.to_string(), "Adding FlightData to the Dataset");

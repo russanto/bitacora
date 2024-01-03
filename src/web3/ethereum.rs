@@ -19,6 +19,7 @@ use ethers::{
 };
 
 use crate::state::entities::{Dataset, Device, PublicKey};
+use crate::configuration::BitacoraConfiguration;
 use crate::web3::traits::TxStatus;
 use super::traits::{ Timestamper, Web3Error, Web3Info, Blockchain, Tx };
 
@@ -35,6 +36,15 @@ pub struct EthereumTimestamper<M: Middleware, P: JsonRpcClient> {
     provider: Arc<Provider<P>>,
     contract: EthBitacoraContract<M>,
     pub status: EthereumTimestamperState
+}
+
+fn generate_bitacora_contract_info() -> (ethers::abi::Abi, ethers::types::Bytes) {
+
+    let contract_base_path = BitacoraConfiguration::get_web3_contract_base_dir();
+    let contract_path = Path::new(&contract_base_path);
+    let compiled = Solc::default().compile_source(contract_path).unwrap();
+    let (abi, bytecode, _runtime_bytecode) = compiled.find("Bitacora").expect("could not find contract").into_parts_or_default();
+    (abi, bytecode)
 }
 
 pub fn new_ethereum_timestamper<M: Middleware, P: JsonRpcClient>(middleware: M, provider: Provider<P>, address: &str) -> Result<EthereumTimestamper<M, P>, Web3Error> {
@@ -84,11 +94,7 @@ pub async fn new_ethereum_timestamper_from_devnode() -> (EthereumTimestamper<Arc
     // 1. Start dev node and configure contract paths
     let anvil = Anvil::new().spawn();
 
-    let contract_path = Path::new(&env!("CARGO_MANIFEST_DIR")).join("contracts/contracts/Bitacora.sol");
-    
-    let compiled = Solc::default().compile_source(contract_path).unwrap();
-
-    let (abi, bytecode, _runtime_bytecode) = compiled.find("Bitacora").expect("could not find contract").into_parts_or_default();
+    let (abi, bytecode) = generate_bitacora_contract_info();
 
     // 2. instantiate wallet
     let wallet: LocalWallet = anvil.keys()[0].clone().into();
@@ -118,18 +124,14 @@ pub async fn new_ethereum_timestamper_from_devnode() -> (EthereumTimestamper<Arc
     (timestamper.unwrap(), anvil)
 }
 
-pub async fn new_ethereum_timestamper_from_url(url: &str) -> Result<EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>, Web3Error> {
+pub async fn new_ethereum_timestamper_from_url_with_sk(url: &str, sk: &str) -> Result<EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>, Web3Error> {
 
-    let contract_path = Path::new(&env!("CARGO_MANIFEST_DIR")).join("contracts/contracts/Bitacora.sol");
+    let (abi, bytecode) = generate_bitacora_contract_info();
     
-    let compiled = Solc::default().compile_source(contract_path).unwrap();
-
-    let (abi, bytecode, _runtime_bytecode) = compiled.find("Bitacora").expect("could not find contract").into_parts_or_default();
-
     // 2. instantiate wallet
-    let wallet: LocalWallet = LocalWallet::new(&mut thread_rng());
+    let wallet: LocalWallet = sk.parse::<LocalWallet>().unwrap();
     // 3. connect to the network
-    let provider = Provider::<Http>::try_from(url).unwrap().interval(Duration::from_millis(10u64));
+    let provider = Provider::<Http>::try_from(url).unwrap();
     let chain_id = match provider.get_chainid().await {
         Ok(chain_id) => chain_id,
         Err(_) => return Err(Web3Error::ProviderConnectionFailed)
