@@ -4,6 +4,7 @@ use tracing::{warn, info, debug, trace};
 
 use crate::common::merkle::Keccak256;
 use crate::common::prelude::MerkleTree;
+use crate::configuration::BitacoraConfiguration as Conf;
 use crate::storage::errors::Error as StorageError;
 use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
 use crate::web3::traits::Timestamper;
@@ -74,7 +75,7 @@ where
         let mut dataset = match dataset {
             Some(ds) => ds,
             None => {
-                let dataset_default_count = configuration::BitacoraConfiguration::get_dataset_default_count();
+                let dataset_default_count = Conf::get_dataset_default_count();
                 match self.new_dataset(dataset_default_count, device_id) {
                     Ok(new_dataset) => new_dataset,
                     //TODO handle failure here (FlightData has no Dataset)
