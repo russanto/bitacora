@@ -2,17 +2,17 @@ use std::sync::Arc;
 
 use tracing::{warn, info, debug, trace};
 
-use crate::common::merkle::Keccak256;
-use crate::common::prelude::MerkleTree;
+use crate::common::prelude::*;
+
 use crate::configuration::BitacoraConfiguration as Conf;
 use crate::storage::errors::Error as StorageError;
 use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
 use crate::web3::traits::Timestamper;
 
-use super::entities::{FlightData, Device, DeviceId, Dataset, Entity, FlightDataId};
+use super::entities::{FlightData, Device, DeviceId, Dataset, Entity, FlightDataId, DatasetId};
 use super::errors::BitacoraError;
 
-pub const DATASET_DEFAULT_LIMIT: u32 = 10;  //TODO: refactor with configuration management
+pub const DATASET_DEFAULT_LIMIT: u32 = 10;
 
 type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
 
@@ -92,16 +92,11 @@ where
             Err(storage_error) => return Err(BitacoraError::StorageError(storage_error))
         }
         if dataset.count == dataset.limit {
-            let fds = match self.storage.get_dataset_flight_data(&dataset.id) {
+            let fds = match self.storage.get_dataset_flight_datas(&dataset.id) {
                 Ok(fds) => fds,
                 Err(err) => return Err(BitacoraError::StorageError(err))
             };
-            let mut fd_mt = MerkleTree::<Keccak256>::new();
-            for fd in fds {
-                fd_mt.append(&fd.to_bytes());
-            }
-            dataset.merkle_root = fd_mt.root().cloned();
-            self.timestamp_dataset(&mut dataset, device_id).await?;
+            self.timestamp_dataset(&mut dataset, device_id, &fds).await?;
         }
         Ok(dataset)
     }
@@ -116,7 +111,6 @@ where
             id: new_id.clone(),
             limit,
             count: 0,
-            merkle_root: None,
             web3: None
         };
         match self.storage.add_dataset(&dataset, device_id) {
@@ -156,8 +150,8 @@ where
         }
     }
 
-    async fn timestamp_dataset(&self, dataset: &mut Dataset, device_id: &String) -> Result<(), BitacoraError> {
-        match self.timestamper.register_dataset(dataset, device_id).await {
+    async fn timestamp_dataset(&self, dataset: &mut Dataset, device_id: &String, flight_datas: &[FlightData]) -> Result<(), BitacoraError> {
+        match self.timestamper.register_dataset(dataset, device_id, flight_datas).await {
             Ok(web3_info) => {
                 info!(dataset=dataset.id, tx_hash=web3_info.tx.hash.to_string(), "Dataset submitted to blockchain");
                 dataset.web3 = Some(web3_info);
@@ -200,8 +194,12 @@ impl <S: FullStorage, T: Timestamper> DatasetStorage for SharedBitacora<S, T> {
         self.storage.add_flight_data(ds_id, fd)
     }
 
-    fn get_dataset_flight_data(&self, ds_id: &super::entities::DatasetId) -> Result<Vec<FlightData>, StorageError> {
-        self.storage.get_dataset_flight_data(ds_id)
+    fn get_dataset_flight_datas(&self, ds_id: &super::entities::DatasetId) -> Result<Vec<FlightData>, StorageError> {
+        self.storage.get_dataset_flight_datas(ds_id)
+    }
+
+    fn get_flight_data_dataset(&self, fd_id: &FlightDataId) -> Result<Dataset, StorageError> {
+        self.storage.get_flight_data_dataset(fd_id)
     }
 
     fn add_dataset(&self, ds: &Dataset, device_id: &DeviceId) -> Result<(), crate::storage::errors::Error> {

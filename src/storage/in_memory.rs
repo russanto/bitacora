@@ -13,7 +13,8 @@ pub struct InMemoryStorage {
     devices: RwLock<HashMap<DeviceId, Device>>,
     fligth_data: RwLock<HashMap<FlightDataId, FlightData>>,
     datasets: RwLock<HashMap<DatasetId, Dataset>>,
-    datasets_flight_data: RwLock<HashMap<DatasetId, Vec<FlightDataId>>>,
+    datasets_flight_datas: RwLock<HashMap<DatasetId, Vec<FlightDataId>>>,
+    flight_data_dataset: RwLock<HashMap<FlightDataId, DatasetId>>,
     devices_datasets: RwLock<HashMap<DeviceId, Vec<DatasetId>>>
 }
 
@@ -70,23 +71,25 @@ impl FlightDataStorage for InMemoryStorage {
 
 impl DatasetStorage for InMemoryStorage {
     fn add_flight_data(&self, ds_id: &DatasetId, fd: &FlightData) -> Result<(), Error> {
-        let mut write_access = self.datasets_flight_data.write().unwrap();
-        match write_access.get_mut(ds_id) {
+        let mut wa_datasets = self.datasets.write().unwrap();
+        let mut wa_datasets_flight_datas = self.datasets_flight_datas.write().unwrap();
+        let mut wa_flight_data_dataset = self.flight_data_dataset.write().unwrap();
+        match wa_datasets_flight_datas.get_mut(ds_id) {
             Some(vector) => {
                 vector.push(fd.id.clone());
             },
             None => return Err(Error::InconsistentRelatedData(String::from("Dataset"), String::from("FlightData")))
         };
-        let mut write_access = self.datasets.write().unwrap();
-        match write_access.get_mut(ds_id) {
+        wa_flight_data_dataset.insert(fd.id.clone(), ds_id.clone());
+        match wa_datasets.get_mut(ds_id) {
             Some(dataset) => dataset.count += 1,
             None => unreachable!()
         }
         Ok(())
     }
 
-    fn get_dataset_flight_data(&self, ds_id: &DatasetId) -> Result<Vec<FlightData>, Error> {
-        let read_access_cross_ds_fd = self.datasets_flight_data.read().unwrap();
+    fn get_dataset_flight_datas(&self, ds_id: &DatasetId) -> Result<Vec<FlightData>, Error> {
+        let read_access_cross_ds_fd = self.datasets_flight_datas.read().unwrap();
         let read_access_fds = self.fligth_data.read().unwrap();
         let fd_ids = match read_access_cross_ds_fd.get(ds_id) {
             Some(fd_ids) => fd_ids,
@@ -99,11 +102,14 @@ impl DatasetStorage for InMemoryStorage {
         Ok(fds)
     }
 
+    fn get_flight_data_dataset(&self, fd_id: &FlightDataId) -> Result<Dataset, Error> {
+        let ra_flight_data_dataset = self.flight_data_dataset.read().unwrap();
+        let ds_id = ra_flight_data_dataset.get(fd_id);
+        Ok(self.datasets.read().unwrap().get(ds_id.unwrap()).unwrap().clone())
+    }
+
     fn get_dataset(&self, id: &DatasetId) -> Result<Option<Dataset>, Error> {
-        match self.datasets.read().unwrap().get(id) {
-            Some(dataset) => Ok(Some(dataset.clone())),
-            None => Ok(Option::None)
-        }
+        Ok(self.datasets.read().unwrap().get(id).cloned())
     }
 
     fn set_dataset(&self, ds: &Dataset) -> Result<bool, Error> {
@@ -126,7 +132,7 @@ impl DatasetStorage for InMemoryStorage {
                     Some(dataset_list) => dataset_list.push(ds.id.clone()),
                     None => return Err(Error::FailedRelatingData(String::from("Dataset"), String::from("Device")))
                 }
-                self.datasets_flight_data.write().unwrap().insert(ds.id.clone(), vec![]);
+                self.datasets_flight_datas.write().unwrap().insert(ds.id.clone(), vec![]);
                 Ok(())
             }
         }

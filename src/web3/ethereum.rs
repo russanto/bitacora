@@ -18,10 +18,11 @@ use ethers::{
     utils::AnvilInstance
 };
 
-use crate::state::entities::{Dataset, Device, PublicKey};
+use crate::common::merkle::Keccak256;
 use crate::configuration::BitacoraConfiguration;
+use crate::state::entities::{Dataset, Device, PublicKey, FlightData};
 use crate::web3::traits::TxStatus;
-use super::traits::{ Timestamper, Web3Error, Web3Info, Blockchain, Tx };
+use super::traits::{MerkleTreeOpenZeppelinReceipt, Timestamper, Web3Error, Web3Info, Blockchain, Tx };
 
 use crate::common::prelude::*;
 
@@ -166,15 +167,18 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTime
         Ok(Device { id: result.0, pk: PublicKey::from(result.1), web3: Option::None })
     }
 
-    pub async fn get_dataset(&self, id: String, device_id: String) -> Result<MerkleRoot, Box<dyn std::error::Error>> {
-        let dataset_response = self.contract.get_dataset(id, device_id);
-        let result = dataset_response.call().await?;
-        Ok(Bytes32(result))
-    }
+    // pub async fn get_dataset(&self, id: String, device_id: String) -> Result<<<EthereumTimestamper<M, P> as Timestamper>::MerkleTree as MerkleTree>::Root, Box<dyn std::error::Error>> {
+    //     let dataset_response = self.contract.get_dataset(id, device_id);
+    //     let result = dataset_response.call().await?;
+    //     Ok(Bytes32(result))
+    // }
 }
 
 #[async_trait]
 impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper for EthereumTimestamper<M, P> {
+
+    type MerkleTree = MerkleTreeOpenZepplin;
+
     async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error>  {
         let device_response = self.contract.register_device(device.id.clone(), device.pk.0);
         
@@ -182,13 +186,13 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
             Ok(pending_tx) => {
                 let maybe_receipt = pending_tx.await;
                 match maybe_receipt {
-                    Ok(Some(receipt)) => Ok(Web3Info {
-                        blockchain: Blockchain::devnet(),
-                        tx: Tx {
-                            hash: receipt.transaction_hash.try_into().unwrap(),
-                            status: TxStatus::Confirmed
-                        }
-                    }),
+                    Ok(Some(receipt)) => Ok(Web3Info::new(
+                        Blockchain::devnet(),
+                        Tx::new(
+                            receipt.transaction_hash.try_into().unwrap(),
+                            TxStatus::Confirmed
+                        )   
+                    )),
                     Ok(None) => unimplemented!(),
                     Err(_) => unimplemented!()
                 }
@@ -202,23 +206,30 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
         x
     }
 
-    async fn register_dataset(&self, dataset: &Dataset, device_id: &String) -> Result<Web3Info, Web3Error> {
-        if dataset.merkle_root.is_none() {
-            return Err(Web3Error::BadInputData(String::from("MerkleTree")));
+    async fn register_dataset(&self, dataset: &Dataset, device_id: &String, flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error> {
+        let mut fd_mt = MerkleTreeOpenZepplin::new();
+        for fd in flight_datas {
+            fd_mt.append(&fd.to_bytes());
         }
-        let response = self.contract.register_dataset(dataset.id.clone(), device_id.clone(), dataset.merkle_root.clone().unwrap().into());
+        let merkle_root = fd_mt.root().unwrap();
+        let response = self.contract.register_dataset(
+            dataset.id.clone(),
+            device_id.clone(),
+            merkle_root.into()
+        );
         
         let x = match response.send().await {
             Ok(pending_tx) => {
                 let maybe_receipt = pending_tx.await;
                 match maybe_receipt {
-                    Ok(Some(receipt)) => Ok(Web3Info {
-                        blockchain: Blockchain::devnet(),
-                        tx: Tx {
-                            hash: receipt.transaction_hash.try_into().unwrap(),
-                            status: TxStatus::Confirmed
-                        }
-                    }),
+                    Ok(Some(receipt)) => Ok(Web3Info::new_with_merkle(
+                        Blockchain::devnet(),
+                        Tx::new(
+                            receipt.transaction_hash.try_into().unwrap(),
+                            TxStatus::Confirmed
+                        ),
+                        MerkleTreeOpenZeppelinReceipt::Root(merkle_root)
+                    )),
                     Ok(None) => unimplemented!(),
                     Err(_) => unimplemented!()
                 }

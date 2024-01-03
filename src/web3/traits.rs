@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use ethers::types::H256;
 use serde::Serialize;
 
-use crate::state::entities::{Device, Dataset};
-use crate::common::bytes::Bytes32;
+use crate::common::prelude::*;
+use crate::state::entities::{Device, Dataset, FlightData};
 
 #[derive(Debug)]
 pub enum Web3Error {
@@ -14,8 +14,11 @@ pub enum Web3Error {
 
 #[async_trait]
 pub trait Timestamper {
+
+    type MerkleTree: MerkleTree;
+
     async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error> ;
-    async fn register_dataset(&self, dataset: &Dataset, device_id: &String) -> Result<Web3Info, Web3Error>;
+    async fn register_dataset(&self, dataset: &Dataset, device_id: &String, flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error>;
     async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error>;
 }
 
@@ -42,9 +45,15 @@ impl From<TxHash> for H256 {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Tx {
-    #[serde(serialize_with = "Bytes32::serialize_as_hex")]
+    #[serde(serialize_with = "serialize_as_hex")]
     pub hash: TxHash,
     pub status: TxStatus
+}
+
+impl Tx {
+    pub fn new(hash: TxHash, status: TxStatus) -> Self {
+        Tx { hash, status }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -64,7 +73,27 @@ impl Blockchain {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub enum MerkleTreeReceipt<MT: MerkleTree> {
+    Root(MT::Root),
+    Proof(MT::Proof)
+}
+
+pub type MerkleTreeOpenZeppelinReceipt = MerkleTreeReceipt<MerkleTreeOpenZepplin>;
+
+#[derive(Clone, Debug, Serialize)]
 pub struct Web3Info {
     pub blockchain: Blockchain,
-    pub tx: Tx
+    pub tx: Tx,
+    pub merkle_receipt: Option<MerkleTreeOpenZeppelinReceipt>
+}
+
+
+impl Web3Info {
+    pub fn new(blockchain: Blockchain, tx: Tx) -> Self {
+        Web3Info { blockchain, tx, merkle_receipt: None }
+    }
+
+    pub fn new_with_merkle(blockchain: Blockchain, tx: Tx, merkle: MerkleTreeOpenZeppelinReceipt) -> Self {
+        Web3Info { blockchain, tx, merkle_receipt: Some(merkle) }
+    }
 }

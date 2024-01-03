@@ -1,24 +1,16 @@
 use std::{convert::TryInto, fmt::Debug, fmt::Display};
 
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use hex::FromHexError;
 use serde::{Serialize, Serializer};
 use sha2::digest::{generic_array::GenericArray, typenum::U32};
 
-#[derive(Clone, Eq, Hash, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd)]
 pub struct Bytes32(pub [u8; 32]);
 
 impl Bytes32 {
     pub fn to_string(&self) -> String {
         String::from(self)
-    }
-
-    pub fn serialize_as_hex<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
-    {
-        let hex_string = format!("0x{}", hex::encode(value.as_ref()));
-        serializer.serialize_str(&hex_string)
     }
 }
 
@@ -27,7 +19,7 @@ impl Serialize for Bytes32 {
     where
         S: Serializer,
     {
-        Self::serialize_as_hex(self, serializer)
+        serialize_as_hex(self, serializer)
     }
 }
 
@@ -119,4 +111,22 @@ impl Debug for Bytes32 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", String::from(self))
     }
+}
+
+pub fn serialize_as_hex<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
+{
+    let hex_string = format!("0x{}", hex::encode(value.as_ref()));
+    serializer.serialize_str(&hex_string)
+}
+
+pub fn serialize_as_b64<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
+{
+    let hex_string = STANDARD.encode(value.as_ref());
+    serializer.serialize_str(&hex_string)
 }

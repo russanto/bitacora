@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use hex;
 use sha2::{Digest, Sha256};
 
-use crate::state::entities::{ Dataset, Device };
+use crate::{state::entities::{ Dataset, Device, FlightData }, common::{prelude::MerkleTreeAppendOnly, merkle::Keccak256}};
 
-use super::traits::{ Blockchain, Timestamper, Web3Info, TxStatus, Tx, Web3Error, TxHash };
+use super::traits::{ Blockchain, Timestamper, Web3Info, TxStatus, Tx, Web3Error, TxHash, MerkleTreeOpenZeppelinReceipt };
 
 #[derive(Default)]
 pub struct EthereumStub {}
@@ -20,24 +20,32 @@ impl EthereumStub {
 
 #[async_trait]
 impl Timestamper for EthereumStub {
-    async fn register_dataset(&self, _dataset: &Dataset, _device_id: &String) -> Result<Web3Info, Web3Error> {
-        Ok(Web3Info {
-            blockchain: Blockchain::ethereum(),
-            tx: Tx {
-                hash: EthereumStub::get_random_tx_hash(),
-                status: TxStatus::Confirmed
-            }
-        })
+
+    type MerkleTree = MerkleTreeAppendOnly<Keccak256>;
+
+    async fn register_dataset(&self, _dataset: &Dataset, _device_id: &String, _flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error> {
+        Ok(
+            Web3Info::new_with_merkle(
+                Blockchain::ethereum(),
+                Tx::new(
+                    EthereumStub::get_random_tx_hash(),
+                    TxStatus::Confirmed
+                ),
+                MerkleTreeOpenZeppelinReceipt::Root(EthereumStub::get_random_tx_hash())
+            )
+        )
     }
 
     async fn register_device(&self, _device: &Device) -> Result<Web3Info, Web3Error> {
-        Ok(Web3Info {
-            blockchain: Blockchain::ethereum(),
-            tx: Tx {
-                hash: EthereumStub::get_random_tx_hash(),
-                status: TxStatus::Confirmed
-            }
-        })
+        Ok(
+            Web3Info::new(
+                Blockchain::ethereum(),
+                Tx::new(
+                    EthereumStub::get_random_tx_hash(),
+                    TxStatus::Confirmed
+                )
+            )
+        )
     }
 
     async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {

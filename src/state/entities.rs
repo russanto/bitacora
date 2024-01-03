@@ -60,7 +60,7 @@ pub type DeviceId = String;
 #[derive(Clone, Debug, Serialize)]
 pub struct Device {
     pub id: DeviceId,
-    #[serde(serialize_with = "Bytes32::serialize_as_hex")]
+    #[serde(serialize_with = "serialize_as_hex")]
     pub pk: PublicKey,
     pub web3: Option<Web3Info>
 }
@@ -144,6 +144,7 @@ pub struct FlightData {
     pub signature: String,
     pub timestamp: u64,
     pub localization: LocalizationPoint,
+    #[serde(serialize_with = "serialize_as_b64")]
     pub payload: Vec<u8>
 }
 
@@ -166,6 +167,5 @@ pub struct Dataset {
     pub id: DatasetId,
     pub limit: u32,
     pub count: u32,
-    pub merkle_root: Option<MerkleRoot>,
     pub web3: Option<Web3Info>
 }
