@@ -83,7 +83,7 @@ pub struct LocalizationPoint {
     pub latitude: f64,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct FlightDataId(Bytes32);
 
 impl FlightDataId {
@@ -138,13 +138,13 @@ impl AsRef<[u8]> for FlightDataId {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FlightData {
     pub id: FlightDataId,
     pub signature: String,
     pub timestamp: u64,
     pub localization: LocalizationPoint,
-    #[serde(serialize_with = "serialize_as_b64")]
+    #[serde(deserialize_with = "deserialize_b64", serialize_with = "serialize_b64")]
     pub payload: Vec<u8>
 }
 

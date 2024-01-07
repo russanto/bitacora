@@ -4,3 +4,4 @@ pub mod get_flight_data;
 pub mod errors;
 pub mod post_device;
 pub mod post_flight_data;
+pub mod post_verify_flight_data;

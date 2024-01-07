@@ -17,7 +17,7 @@ pub mod state;
 pub mod storage;
 pub mod web3;
 
-use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data };
+use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data, post_verify_flight_data };
 use storage::{in_memory::InMemoryStorage, storage::FullStorage};
 
 type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
@@ -49,6 +49,7 @@ async fn main() {
         // `POST /users` goes to `create_user`
         .route("/flight_data", post(post_flight_data::handler))
         .route("/flight_data/:id", get(get_flight_data::handler))
+        .route("/flight_data/:id/verify", post(post_verify_flight_data::handler))
         .route("/dataset/:id", get(get_dataset::handler))
         .with_state(shared_bitacora);
 
