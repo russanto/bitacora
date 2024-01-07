@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use hex;
 use sha2::{Digest, Sha256};
 
-use crate::{state::entities::{ Dataset, Device, FlightData }, common::{prelude::MerkleTreeAppendOnly, merkle::Keccak256}};
+use crate::{state::entities::{ Dataset, Device, FlightData }, common::prelude::* };
 
 use super::traits::{ Blockchain, Timestamper, Web3Info, TxStatus, Tx, Web3Error, TxHash, MerkleTreeOpenZeppelinReceipt };
 
@@ -21,7 +21,7 @@ impl EthereumStub {
 #[async_trait]
 impl Timestamper for EthereumStub {
 
-    type MerkleTree = MerkleTreeAppendOnly<Keccak256>;
+    type MerkleTree = MerkleTreeOpenZepplin;
 
     async fn register_dataset(&self, _dataset: &Dataset, _device_id: &String, _flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error> {
         Ok(

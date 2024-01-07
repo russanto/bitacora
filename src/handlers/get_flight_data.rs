@@ -4,6 +4,7 @@ use serde::Serialize;
 use crate::state::entities::{FlightData, DatasetId};
 use crate::{storage::storage::{FlightDataStorage, FullStorage, DatasetStorage}, web3::traits::{Timestamper, Web3Info}, state::entities::{FlightDataId, LocalizationPoint}};
 use crate::SharedBitacora;
+use crate::web3::traits::MerkleTreeFlightDataReceipt;
 
 use super::errors::ErrorResponse;
 
@@ -35,11 +36,14 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
         Ok(dataset) => dataset,
         Err(_) => return ErrorResponse::storage_error().into_response()
     };
+    let fd_receipt = match state.get_flight_data_receipt(&fd) {
+        Ok(receipt) => receipt,
+        Err(_) => return ErrorResponse::web3_error().into_response()
+    };
     let response = FlightDataResponse {
         flight_data: fd,
         dataset_id: dataset.id,
-        web3: dataset.web3
+        web3: Some(fd_receipt)
     };
     (StatusCode::OK, Json(response)).into_response()
-    
 }

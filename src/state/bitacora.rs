@@ -7,7 +7,7 @@ use crate::common::prelude::*;
 use crate::configuration::BitacoraConfiguration as Conf;
 use crate::storage::errors::Error as StorageError;
 use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
-use crate::web3::traits::Timestamper;
+use crate::web3::traits::{Timestamper, MerkleTreeFlightDataReceipt, Web3Info};
 
 use super::entities::{FlightData, Device, DeviceId, Dataset, Entity, FlightDataId, DatasetId};
 use super::errors::BitacoraError;
@@ -152,8 +152,15 @@ where
 
     async fn timestamp_dataset(&self, dataset: &mut Dataset, device_id: &String, flight_datas: &[FlightData]) -> Result<(), BitacoraError> {
         match self.timestamper.register_dataset(dataset, device_id, flight_datas).await {
-            Ok(web3_info) => {
+            Ok(mut web3_info) => {
                 info!(dataset=dataset.id, tx_hash=web3_info.tx.hash.to_string(), "Dataset submitted to blockchain");
+                web3_info.merkle_receipt = match web3_info.merkle_receipt.unwrap() {
+                    MerkleTreeFlightDataReceipt::Tree(ref mt) => {
+                        let mut mt = mt;
+                        Some(MerkleTreeFlightDataReceipt::Root((mt as &dyn MerkleTree<FlightData, Node = Bytes32>).root().unwrap()))
+                    },
+                    _ => unreachable!()
+                };
                 dataset.web3 = Some(web3_info);
                 match self.storage.set_dataset(dataset) {
                     Ok(_) => Ok(()),
@@ -162,6 +169,16 @@ where
             },
             Err(_) => Err(BitacoraError::Web3Error)
         }
+    }
+
+    pub fn get_flight_data_receipt(&self, fd: &FlightData) -> Result<Web3Info, BitacoraError> {
+        let dataset = self.storage.get_flight_data_dataset(&fd.id)?;
+        let fds = self.storage.get_dataset_flight_datas(&dataset.id)?;
+        let dataset_receipt = match dataset.web3 {
+            Some(receipt) => receipt,
+            None => return Err(BitacoraError::NotFound)
+        };
+        Ok(T::flight_data_web3_info(fd, &fds, &dataset_receipt)?)
     }
 }
 

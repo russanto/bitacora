@@ -211,7 +211,7 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
         for fd in flight_datas {
             fd_mt.append(&fd.to_bytes());
         }
-        let merkle_root = fd_mt.root().unwrap();
+        let merkle_root = (&fd_mt as &dyn MerkleTree<FlightData, Node = Bytes32>).root().unwrap();
         let response = self.contract.register_dataset(
             dataset.id.clone(),
             device_id.clone(),
@@ -228,7 +228,7 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
                             receipt.transaction_hash.try_into().unwrap(),
                             TxStatus::Confirmed
                         ),
-                        MerkleTreeOpenZeppelinReceipt::Root(merkle_root)
+                        MerkleTreeOpenZeppelinReceipt::Tree(fd_mt)
                     )),
                     Ok(None) => unimplemented!(),
                     Err(_) => unimplemented!()

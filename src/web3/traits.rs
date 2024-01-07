@@ -15,11 +15,24 @@ pub enum Web3Error {
 #[async_trait]
 pub trait Timestamper {
 
-    type MerkleTree: MerkleTree;
+    type MerkleTree: MerkleTree<FlightData>;
 
     async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error> ;
     async fn register_dataset(&self, dataset: &Dataset, device_id: &String, flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error>;
     async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error>;
+
+    fn flight_data_web3_info(fd: &FlightData, flight_datas: &[FlightData], dataset_receipt: &Web3Info) -> Result<Web3Info, Web3Error> {
+        let mut fd_mt = MerkleTreeOpenZepplin::new();
+        for fd in flight_datas {
+            fd_mt.append(&fd.to_bytes());
+        }
+        let proof = fd_mt.proof(fd).unwrap(); //TODO: manage here
+        Ok(Web3Info {
+            blockchain: dataset_receipt.blockchain.clone(),
+            tx: dataset_receipt.tx.clone(),
+            merkle_receipt: Some(MerkleTreeOpenZeppelinReceipt::Proof(proof))
+        })
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -73,18 +86,21 @@ impl Blockchain {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub enum MerkleTreeReceipt<MT: MerkleTree> {
-    Root(MT::Root),
-    Proof(MT::Proof)
+pub enum MerkleTreeReceipt<T: AsRef<[u8]>, MT: MerkleTree<T>> {
+    Root(MT::Node),
+    Proof(Vec<MT::Node>),
+    Tree(MT)
 }
 
-pub type MerkleTreeOpenZeppelinReceipt = MerkleTreeReceipt<MerkleTreeOpenZepplin>;
+pub type MerkleTreeOpenZeppelinReceipt<T> = MerkleTreeReceipt<T, MerkleTreeOpenZepplin>;
+
+pub type MerkleTreeFlightDataReceipt = MerkleTreeOpenZeppelinReceipt<FlightData>;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Web3Info {
     pub blockchain: Blockchain,
     pub tx: Tx,
-    pub merkle_receipt: Option<MerkleTreeOpenZeppelinReceipt>
+    pub merkle_receipt: Option<MerkleTreeFlightDataReceipt>
 }
 
 
@@ -93,7 +109,7 @@ impl Web3Info {
         Web3Info { blockchain, tx, merkle_receipt: None }
     }
 
-    pub fn new_with_merkle(blockchain: Blockchain, tx: Tx, merkle: MerkleTreeOpenZeppelinReceipt) -> Self {
+    pub fn new_with_merkle(blockchain: Blockchain, tx: Tx, merkle: MerkleTreeFlightDataReceipt) -> Self {
         Web3Info { blockchain, tx, merkle_receipt: Some(merkle) }
     }
 }

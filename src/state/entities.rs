@@ -160,6 +160,12 @@ impl FlightData {
     }
 }
 
+impl AsRef<[u8]> for FlightData {
+    fn as_ref(&self) -> &[u8] {
+        &self.to_bytes()
+    }
+}
+
 pub type DatasetId = String;
 
 #[derive(Clone, Debug, Serialize)]

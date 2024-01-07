@@ -1,10 +1,13 @@
+use std::{borrow::BorrowMut, cell::RefCell};
+
 use ethers::utils::keccak256;
+use serde::Serialize;
 
 use super::bytes::Bytes32;
 
 pub trait Hasher {
 
-    type ReturnType: AsRef<[u8]> + Clone + Eq + PartialOrd;
+    type ReturnType: AsRef<[u8]> + Clone + Eq + PartialOrd + Serialize;
 
     fn hash<T: AsRef<[u8]>>(data: T) -> Self::ReturnType;
 }
@@ -21,25 +24,16 @@ impl Hasher for Keccak256 {
     }
 }
 
-// pub trait MerkleRoot: AsRef<[u8]> + Sized {}
+pub trait MerkleTree<E: AsRef<[u8]>> {
+    type Node: AsRef<[u8]>;
+    //type Proof; can't default to [Self::Node] so removed it for convenience
 
-// pub trait MerkleProof: Iterator {}
-
-// pub trait MerkleLeaf: AsRef<[u8]> {}
-
-pub trait MerkleTree {
-    type Root: AsRef<[u8]>;
-    type Proof;
-    type Leaf: AsRef<[u8]>;
-
-    //TODO: Add new method here
-
-    fn root(&mut self) -> Option<Self::Root>;
-    fn proof(&mut self, leaf: &Self::Leaf) -> Option<Self::Proof>;
-    fn verify(&mut self, leaf: &Self::Leaf, proof: &Self::Proof) -> bool;
+    fn root(&mut self) -> Option<Self::Node>;
+    fn proof(&mut self, leaf: &E) -> Option<Vec<Self::Node>>;
+    fn verify(&mut self, leaf: &E, proof: &[Self::Node]) -> bool;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct MerkleTreeAppendOnly<H>
 where
     H: Hasher
@@ -130,27 +124,26 @@ impl <H: Hasher> MerkleTreeAppendOnly<H> {
     }
 }
 
-impl <H: Hasher> MerkleTree for MerkleTreeAppendOnly<H> {
+impl <H: Hasher, T: AsRef<[u8]>> MerkleTree<T> for MerkleTreeAppendOnly<H> {
 
-    type Root = H::ReturnType;
-    type Proof = Vec<H::ReturnType>;
-    type Leaf = H::ReturnType;
+    type Node = H::ReturnType;
 
-    fn root(&mut self) -> Option<Self::Root> {
+    fn root(&mut self) -> Option<Self::Node> {
         if !self.is_root_valid() {
             self.compute();
         }
         self.nodes.last().cloned()
     }
 
-    fn proof(&mut self, leaf: &Self::Leaf) -> Option<Self::Proof> {
+    fn proof(&mut self, leaf: &T) -> Option<Vec<Self::Node>> {
         if self.is_empty() {
             return None;
         }
         if !self.is_root_valid() {
             self.compute();
         }
-        let mut item_cursor = match self.nodes.iter().position(|x| x == leaf) {
+        let leaf_hash = H::hash(leaf);
+        let mut item_cursor = match self.nodes.iter().position(|x| x == &leaf_hash) {
             Some(item_index) => item_index,
             None => return None
         };
@@ -197,23 +190,213 @@ impl <H: Hasher> MerkleTree for MerkleTreeAppendOnly<H> {
         Some(proof)
     }
 
-    fn verify(&mut self, leaf: &Self::Leaf, proof: &Self::Proof) -> bool {
+    fn verify(&mut self, leaf: &T, proof: &[Self::Node]) -> bool {
         if self.is_empty() {
             return false;
         }
         if !self.is_root_valid() {
             self.compute();
         }
+        let leaf_hash = H::hash(leaf);
         if proof.is_empty() {
-            return self.nodes.len() == 1 && self.nodes[0] == *leaf;   
+            return self.nodes.len() == 1 && self.nodes[0] == leaf_hash;   
         }
-        let mut accumulator = leaf.clone();
+        let mut accumulator = leaf_hash.clone();
         for proof_component in proof.iter() {
             accumulator = Self::pairwise_hash(&accumulator, proof_component);
         }
-        accumulator == self.root().unwrap()
+        match (self as &dyn MerkleTree<T, Node = Self::Node>).root() {
+            Some(root) => accumulator == root,
+            None => false
+        }
     }
 }
+
+// A stub with interior mutability in order to have a MerkleTree trait without mut in getters
+// #[derive(Clone, Debug, Serialize)]
+// pub struct MerkleTreeAppendOnly<H>
+// where
+//     H: Hasher
+// {
+//     nodes: RefCell<Vec<H::ReturnType>>,
+//     leaves: RefCell<Vec<H::ReturnType>>
+// }
+
+// impl <H: Hasher> Default for MerkleTreeAppendOnly<H> {
+//     fn default() -> Self {
+//         MerkleTreeAppendOnly {
+//             nodes: RefCell::new(Vec::new()),
+//             leaves: RefCell::new(Vec::new())
+//         }
+//     }
+// }
+
+// impl <H: Hasher> MerkleTreeAppendOnly<H> {
+//     pub fn new() -> Self {
+//         Self::default()
+//     }
+
+//     pub fn append<T: AsRef<[u8]>>(&mut self, element: T) -> usize {
+//         let mut leaves = self.leaves.borrow_mut();
+//         leaves.push(H::hash(element));
+//         leaves.len()
+//     }
+
+//     pub fn is_empty(&self) -> bool {
+//         self.nodes.borrow().is_empty() && self.leaves.borrow().is_empty()
+//     }
+
+//     fn is_root_valid(&self) -> bool {
+//         self.leaves.borrow().len() == 0 && self.nodes.borrow().len() > 0
+//     }
+
+//     fn compute(&self) {
+//         let mut nodes = self.nodes.borrow_mut();
+//         let mut leaves = self.leaves.borrow_mut();
+
+//         // Reset the current tree
+//         let total_leaves = (nodes.len()+1)/2;
+//         nodes.truncate(total_leaves);
+//         // Include leaves appended after last computation
+//         nodes.append(&mut leaves);
+//         leaves.clear();
+
+//         let n_leaves = nodes.len();
+//         // With no leaves or one there is not anything to compute
+//         if n_leaves < 2 {
+//             return;
+//         }
+
+//         let mut nodes_start_index = 0;
+//         let mut odd_item_index: Option<usize> = None;
+//         loop {
+//             let nodes_end_index = nodes.len();
+//             for i in 0..(nodes_end_index-nodes_start_index)/2 {
+//                 let base_index = nodes_start_index+(i*2);
+//                 nodes.push(
+//                     Self::pairwise_hash(&nodes[base_index], &nodes[base_index+1])
+//                 );
+//             }
+//             if odd_item_index.is_none() && nodes_end_index % 2 == 1 {
+//                 odd_item_index = Some(nodes_end_index-1);
+//             }
+//             if nodes_end_index - nodes_start_index <= 2 {
+//                 if odd_item_index.is_some() {
+//                     nodes.push(
+//                         Self::pairwise_hash(
+//                             nodes.last().unwrap(),
+//                             &nodes[odd_item_index.unwrap()]
+//                         )
+//                     );
+//                 }
+//                 return;
+//             }
+//             nodes_start_index = nodes_end_index;
+//         }
+//     }
+
+//     fn pairwise_hash(v1: &H::ReturnType, v2: &H::ReturnType) -> H::ReturnType {
+//         let mut hash_buffer = Vec::new(); // TODO: make it reusable and remove from heap
+//         if v1 < v2 {
+//             hash_buffer.extend_from_slice(v1.as_ref());
+//             hash_buffer.extend_from_slice(v2.as_ref());
+//         } else {
+//             hash_buffer.extend_from_slice(v2.as_ref());
+//             hash_buffer.extend_from_slice(v1.as_ref());
+//         }
+//         H::hash(hash_buffer)
+//     }
+// }
+
+// impl <H: Hasher, T: AsRef<[u8]>> MerkleTree<T> for MerkleTreeAppendOnly<H> {
+
+//     type Node = H::ReturnType;
+
+//     fn root(&self) -> Option<Self::Node> {
+//         if !self.is_root_valid() {
+//             self.compute();
+//         }
+//         self.nodes.borrow().last().cloned()
+//     }
+
+//     fn proof(&self, leaf: &T) -> Option<Vec<Self::Node>> {
+//         let nodes = self.nodes.borrow();
+//         if self.is_empty() {
+//             return None;
+//         }
+//         if !self.is_root_valid() {
+//             self.compute();
+//         }
+//         let leaf_hash = H::hash(leaf);
+//         let mut item_cursor = match nodes.iter().position(|x| x == &leaf_hash) {
+//             Some(item_index) => item_index,
+//             None => return None
+//         };
+//         let mut proof = Vec::new();
+//         let n_leaves = (nodes.len()+1)/2;
+//         let tree_depth = if n_leaves.is_power_of_two() {
+//             n_leaves.ilog2()
+//         } else {
+//             n_leaves.ilog2()+1
+//         };
+//         let mut start_index = 0;
+//         let mut end_index = n_leaves;
+//         let mut odd_levels_count = 0;
+//         let mut odd_element_index = 0;
+//         let mut odd_element_rebalance = 0;
+//         let mut item_index = start_index+item_cursor;
+//         for _ in 0..tree_depth {
+//             if (end_index - start_index) % 2 == 1 {
+//                 odd_levels_count += 1;
+//                 if odd_levels_count % 2 == 0 {
+//                     odd_element_rebalance = 1;
+//                 } else {
+//                     odd_element_index = end_index-1;
+//                 }
+//             } 
+//             if item_cursor % 2 == 1 {
+//                 proof.push(nodes[item_index-1].clone());
+//             } else {
+//                 if item_index < end_index-1 {
+//                     proof.push(nodes[item_index+1].clone())
+//                 } else {
+//                     if odd_levels_count % 2 == 0 {
+//                         proof.push(nodes[odd_element_index].clone());
+//                     }
+//                 }
+//             }
+//             let n_next_level = (end_index-start_index)/2;
+//             start_index = end_index;
+//             end_index += n_next_level + odd_element_rebalance;
+//             odd_element_rebalance = 0;
+//             item_cursor /= 2;
+//             item_index = start_index+item_cursor;
+//         }
+//         Some(proof)
+//     }
+
+//     fn verify(&self, leaf: &T, proof: &[Self::Node]) -> bool {
+//         let nodes = self.nodes.borrow();
+//         if self.is_empty() {
+//             return false;
+//         }
+//         if !self.is_root_valid() {
+//             self.compute();
+//         }
+//         let leaf_hash = H::hash(leaf);
+//         if proof.is_empty() {
+//             return nodes.len() == 1 && nodes[0] == leaf_hash;   
+//         }
+//         let mut accumulator = leaf_hash.clone();
+//         for proof_component in proof.iter() {
+//             accumulator = Self::pairwise_hash(&accumulator, proof_component);
+//         }
+//         match (self as &dyn MerkleTree<T, Node = Self::Node>).root() {
+//             Some(root) => accumulator == root,
+//             None => false
+//         }
+//     }
+// }
 
 pub type MerkleTreeOpenZepplin = MerkleTreeAppendOnly<Keccak256>;
 
