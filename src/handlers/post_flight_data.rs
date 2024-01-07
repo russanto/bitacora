@@ -74,7 +74,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
             BitacoraError::NotFound => ErrorResponse::not_found("Device").into_response(),
             BitacoraError::StorageError(_) => ErrorResponse::storage_error().into_response(),
             BitacoraError::Web3Error => ErrorResponse::web3_error().into_response(),
-            BitacoraError::BadIdFormat => ErrorResponse::bad_input("device_id", Some("Bad Device Id")).into_response() //this should be unreachable
+            BitacoraError::BadId(_id_err) => ErrorResponse::bad_input("device_id", Some("Bad Device Id")).into_response() //this should be unreachable
         }
     }
 }

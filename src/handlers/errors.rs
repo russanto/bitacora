@@ -91,7 +91,7 @@ impl From<BitacoraError> for ErrorResponse {
             BitacoraError::Web3Error => ErrorResponse::web3_error(),
             BitacoraError::NotFound => ErrorResponse::not_found(&String::from("CHANGE ME")),
             BitacoraError::StorageError(_) => ErrorResponse::storage_error(),
-            BitacoraError::BadIdFormat => ErrorResponse::bad_input("id", None)
+            BitacoraError::BadId(_id_err) => ErrorResponse::bad_input("id", None)
         }
     }
 }

@@ -2,14 +2,17 @@ use std::{fmt::Display, hash};
 
 use ethers::utils::keccak256;
 use hex::FromHexError;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{self, Unexpected, Visitor};
 use sha2::{ Digest, Sha256 };
+use std::fmt;
 
+use crate::common::bytes::Bytes32DecodeError;
 use crate::{web3::traits::Web3Info};
 
 use crate::common::prelude::*;
 
-use super::errors::BitacoraError;
+use super::errors::{BitacoraError, IdError};
 
 pub const ID_BYTE_LENGTH: u8 = 16;
 pub const FLIGHT_DATA_ID_PREFIX: u8 = 1;
@@ -116,13 +119,22 @@ impl TryFrom<String> for FlightDataId {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match bs58::decode(value).into_vec() {
             Ok(id_bytes) => {
-                if id_bytes.len() != 32 {
-                    return Err(BitacoraError::BadIdFormat);
-                }
-                Ok(FlightDataId(id_bytes.try_into().unwrap()))
+                id_bytes.try_into().map(|bytes32| {
+                    FlightDataId(bytes32)
+                }).map_err(|err| {
+                    match err {
+                        Bytes32DecodeError::BadLength(len) => BitacoraError::BadId(IdError::Length(len, 32))
+                    }
+                })
             },
-            Err(_) => Err(BitacoraError::BadIdFormat)
+            Err(_) => Err(BitacoraError::BadId(IdError::Unknown))
         }
+    }
+}
+
+impl From<Bytes32> for FlightDataId {
+    fn from(value: Bytes32) -> Self {
+        FlightDataId(value)
     }
 }
 
@@ -138,8 +150,41 @@ impl AsRef<[u8]> for FlightDataId {
     }
 }
 
+pub fn deserialize_b58_to_flight_data_id<'de, D>(deserializer: D) -> Result<FlightDataId, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct Base58Visitor;
+
+    impl<'de> Visitor<'de> for Base58Visitor {
+        type Value = FlightDataId;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a Base64 encoded string representing 32 bytes")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            FlightDataId::try_from(String::from(value)).map_err(|err| {
+                match err {
+                    BitacoraError::BadId(id_err) => match id_err {
+                        IdError::Length(cur, exp) => E::invalid_length(cur, &self),
+                        _ => unimplemented!()
+                    },
+                    _ => unreachable!()
+                }
+            })
+        }
+    }
+
+    deserializer.deserialize_str(Base58Visitor)
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FlightData {
+    #[serde(deserialize_with = "deserialize_b58_to_flight_data_id", serialize_with = "serialize_b64")]
     pub id: FlightDataId,
     pub signature: String,
     pub timestamp: u64,

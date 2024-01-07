@@ -119,16 +119,17 @@ impl From<GenericArray<u8, U32>> for Bytes32 {
 }
 
 #[derive(Debug)]
-pub struct BadArrayLength(usize);
-
+pub enum Bytes32DecodeError {
+    BadLength(usize)
+}
 impl TryFrom<Vec<u8>> for Bytes32 {
 
-    type Error = BadArrayLength;
+    type Error = Bytes32DecodeError;
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         match value.try_into() {
             Ok(r) => Ok(Bytes32(r)),
-            Err(err) => Err(BadArrayLength(err.len()))
+            Err(err) => Err(Bytes32DecodeError::BadLength(err.len()))
         }
     }
 }
@@ -188,6 +189,36 @@ where
         {
             STANDARD.decode(value).map_err(|_err| {
                 E::invalid_value(Unexpected::Str(value), &self)
+            })
+        }
+    }
+
+    deserializer.deserialize_str(Base64Visitor)
+}
+
+pub fn deserialize_b64_to_bytes32<'de, D>(deserializer: D) -> Result<Bytes32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct Base64Visitor;
+
+    impl<'de> Visitor<'de> for Base64Visitor {
+        type Value = Bytes32;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a Base64 encoded string representing 32 bytes")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            STANDARD.decode(value).map_err(|_err| {
+                E::invalid_value(Unexpected::Str(value), &self)
+            })?.try_into().map_err(|err| {
+                match err {
+                    Bytes32DecodeError::BadLength(len) => E::invalid_length(len, &self)
+                }
             })
         }
     }

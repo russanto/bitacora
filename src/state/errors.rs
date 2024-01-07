@@ -1,19 +1,26 @@
-use crate::storage::errors::Error;
+use crate::storage::errors::Error as StorageError;
 use crate::web3::traits::Web3Error;
 
 use super::entities::Entity;
 
 #[derive(Debug)]
+pub enum IdError {
+    Length(usize, usize),
+    Format(&'static str, &'static str),
+    Unknown
+}
+
+#[derive(Debug)]
 pub enum BitacoraError {
     NotFound,
     AlreadyExists(Entity, String),
-    StorageError(Error),
+    StorageError(StorageError),
     Web3Error,
-    BadIdFormat
+    BadId(IdError)
 }
 
-impl From<Error> for BitacoraError {
-    fn from(value: Error) -> Self {
+impl From<StorageError> for BitacoraError {
+    fn from(value: StorageError) -> Self {
         Self::StorageError(value)
     }
 }
