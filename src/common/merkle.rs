@@ -24,13 +24,13 @@ impl Hasher for Keccak256 {
     }
 }
 
-pub trait MerkleTree<E: AsRef<[u8]>> {
+pub trait MerkleTree {
     type Node: AsRef<[u8]>;
     //type Proof; can't default to [Self::Node] so removed it for convenience
 
     fn root(&mut self) -> Option<Self::Node>;
-    fn proof(&mut self, leaf: &E) -> Option<Vec<Self::Node>>;
-    fn verify(&mut self, leaf: &E, proof: &[Self::Node]) -> bool;
+    fn proof<E: AsRef<[u8]>>(&mut self, leaf: &E) -> Option<Vec<Self::Node>>;
+    fn verify<E: AsRef<[u8]>>(&mut self, leaf: &E, proof: &[Self::Node]) -> bool;
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -124,7 +124,7 @@ impl <H: Hasher> MerkleTreeAppendOnly<H> {
     }
 }
 
-impl <H: Hasher, T: AsRef<[u8]>> MerkleTree<T> for MerkleTreeAppendOnly<H> {
+impl <H: Hasher> MerkleTree for MerkleTreeAppendOnly<H> {
 
     type Node = H::ReturnType;
 
@@ -135,7 +135,7 @@ impl <H: Hasher, T: AsRef<[u8]>> MerkleTree<T> for MerkleTreeAppendOnly<H> {
         self.nodes.last().cloned()
     }
 
-    fn proof(&mut self, leaf: &T) -> Option<Vec<Self::Node>> {
+    fn proof<T: AsRef<[u8]>>(&mut self, leaf: &T) -> Option<Vec<Self::Node>> {
         if self.is_empty() {
             return None;
         }
@@ -190,7 +190,7 @@ impl <H: Hasher, T: AsRef<[u8]>> MerkleTree<T> for MerkleTreeAppendOnly<H> {
         Some(proof)
     }
 
-    fn verify(&mut self, leaf: &T, proof: &[Self::Node]) -> bool {
+    fn verify<T: AsRef<[u8]>>(&mut self, leaf: &T, proof: &[Self::Node]) -> bool {
         if self.is_empty() {
             return false;
         }
@@ -205,7 +205,7 @@ impl <H: Hasher, T: AsRef<[u8]>> MerkleTree<T> for MerkleTreeAppendOnly<H> {
         for proof_component in proof.iter() {
             accumulator = Self::pairwise_hash(&accumulator, proof_component);
         }
-        match (self as &dyn MerkleTree<T, Node = Self::Node>).root() {
+        match self.root() {
             Some(root) => accumulator == root,
             None => false
         }
@@ -398,7 +398,7 @@ impl <H: Hasher, T: AsRef<[u8]>> MerkleTree<T> for MerkleTreeAppendOnly<H> {
 //     }
 // }
 
-pub type MerkleTreeOpenZepplin = MerkleTreeAppendOnly<Keccak256>;
+pub type MerkleTreeOZ = MerkleTreeAppendOnly<Keccak256>;
 
 #[cfg(test)]
 mod test {

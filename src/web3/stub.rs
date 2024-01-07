@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{state::entities::{ Dataset, Device, FlightData }, common::prelude::* };
 
-use super::traits::{ Blockchain, Timestamper, Web3Info, TxStatus, Tx, Web3Error, TxHash, MerkleTreeOpenZeppelinReceipt };
+use super::traits::{ Blockchain, Timestamper, Web3Info, TxStatus, Tx, Web3Error, TxHash, MerkleTreeOZReceipt };
 
 #[derive(Default)]
 pub struct EthereumStub {}
@@ -21,7 +21,7 @@ impl EthereumStub {
 #[async_trait]
 impl Timestamper for EthereumStub {
 
-    type MerkleTree = MerkleTreeOpenZepplin;
+    type MerkleTree = MerkleTreeOZ;
 
     async fn register_dataset(&self, _dataset: &Dataset, _device_id: &String, _flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error> {
         Ok(
@@ -31,7 +31,7 @@ impl Timestamper for EthereumStub {
                     EthereumStub::get_random_tx_hash(),
                     TxStatus::Confirmed
                 ),
-                MerkleTreeOpenZeppelinReceipt::Root(EthereumStub::get_random_tx_hash())
+                MerkleTreeOZReceipt::Root(EthereumStub::get_random_tx_hash())
             )
         )
     }

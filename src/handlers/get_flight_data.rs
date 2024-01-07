@@ -4,7 +4,6 @@ use serde::Serialize;
 use crate::state::entities::{FlightData, DatasetId};
 use crate::{storage::storage::{FlightDataStorage, FullStorage, DatasetStorage}, web3::traits::{Timestamper, Web3Info}, state::entities::{FlightDataId, LocalizationPoint}};
 use crate::SharedBitacora;
-use crate::web3::traits::MerkleTreeFlightDataReceipt;
 
 use super::errors::ErrorResponse;
 

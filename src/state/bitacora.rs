@@ -7,7 +7,7 @@ use crate::common::prelude::*;
 use crate::configuration::BitacoraConfiguration as Conf;
 use crate::storage::errors::Error as StorageError;
 use crate::storage::storage::{FullStorage, FlightDataStorage, DeviceStorage, DatasetStorage};
-use crate::web3::traits::{Timestamper, MerkleTreeFlightDataReceipt, Web3Info};
+use crate::web3::traits::{Timestamper, MerkleTreeOZReceipt, Web3Info};
 
 use super::entities::{FlightData, Device, DeviceId, Dataset, Entity, FlightDataId, DatasetId};
 use super::errors::BitacoraError;
@@ -155,10 +155,7 @@ where
             Ok(mut web3_info) => {
                 info!(dataset=dataset.id, tx_hash=web3_info.tx.hash.to_string(), "Dataset submitted to blockchain");
                 web3_info.merkle_receipt = match web3_info.merkle_receipt.unwrap() {
-                    MerkleTreeFlightDataReceipt::Tree(ref mt) => {
-                        let mut mt = mt;
-                        Some(MerkleTreeFlightDataReceipt::Root((mt as &dyn MerkleTree<FlightData, Node = Bytes32>).root().unwrap()))
-                    },
+                    MerkleTreeOZReceipt::Tree(ref mut mt) => Some(MerkleTreeOZReceipt::Root(mt.root().unwrap())),
                     _ => unreachable!()
                 };
                 dataset.web3 = Some(web3_info);

@@ -22,7 +22,7 @@ use crate::common::merkle::Keccak256;
 use crate::configuration::BitacoraConfiguration;
 use crate::state::entities::{Dataset, Device, PublicKey, FlightData};
 use crate::web3::traits::TxStatus;
-use super::traits::{MerkleTreeOpenZeppelinReceipt, Timestamper, Web3Error, Web3Info, Blockchain, Tx };
+use super::traits::{MerkleTreeOZReceipt, Timestamper, Web3Error, Web3Info, Blockchain, Tx };
 
 use crate::common::prelude::*;
 
@@ -177,7 +177,7 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTime
 #[async_trait]
 impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper for EthereumTimestamper<M, P> {
 
-    type MerkleTree = MerkleTreeOpenZepplin;
+    type MerkleTree = MerkleTreeOZ;
 
     async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error>  {
         let device_response = self.contract.register_device(device.id.clone(), device.pk.0);
@@ -207,11 +207,11 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
     }
 
     async fn register_dataset(&self, dataset: &Dataset, device_id: &String, flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error> {
-        let mut fd_mt = MerkleTreeOpenZepplin::new();
+        let mut fd_mt = MerkleTreeOZ::new();
         for fd in flight_datas {
             fd_mt.append(&fd.to_bytes());
         }
-        let merkle_root = (&fd_mt as &dyn MerkleTree<FlightData, Node = Bytes32>).root().unwrap();
+        let merkle_root = fd_mt.root().unwrap();
         let response = self.contract.register_dataset(
             dataset.id.clone(),
             device_id.clone(),
@@ -228,7 +228,7 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
                             receipt.transaction_hash.try_into().unwrap(),
                             TxStatus::Confirmed
                         ),
-                        MerkleTreeOpenZeppelinReceipt::Tree(fd_mt)
+                        MerkleTreeOZReceipt::Tree(fd_mt)
                     )),
                     Ok(None) => unimplemented!(),
                     Err(_) => unimplemented!()
