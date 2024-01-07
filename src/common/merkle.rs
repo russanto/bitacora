@@ -26,10 +26,10 @@ impl Hasher for Keccak256 {
 
 pub trait MerkleTree {
     type Node: AsRef<[u8]>;
-    //type Proof; can't default to [Self::Node] so removed it for convenience
+    type Proof;
 
     fn root(&mut self) -> Option<Self::Node>;
-    fn proof<E: AsRef<[u8]>>(&mut self, leaf: &E) -> Option<Vec<Self::Node>>;
+    fn proof<E: AsRef<[u8]>>(&mut self, leaf: &E) -> Option<Self::Proof>;
     fn verify<E: AsRef<[u8]>>(&mut self, leaf: &E, proof: &[Self::Node]) -> bool;
 }
 
@@ -122,11 +122,24 @@ impl <H: Hasher> MerkleTreeAppendOnly<H> {
         }
         H::hash(hash_buffer)
     }
+
+    pub fn verify_from_root<T: AsRef<[u8]>>(root: &H::ReturnType, leaf: &T, proof: &[H::ReturnType]) -> bool {
+        let leaf_hash = H::hash(leaf);
+        if proof.is_empty() {
+            return *root == leaf_hash;
+        }
+        let mut accumulator = leaf_hash.clone();
+        for proof_component in proof {
+            accumulator = Self::pairwise_hash(&accumulator, proof_component);
+        }
+        accumulator == *root
+    }
 }
 
 impl <H: Hasher> MerkleTree for MerkleTreeAppendOnly<H> {
 
     type Node = H::ReturnType;
+    type Proof = Vec<H::ReturnType>;
 
     fn root(&mut self) -> Option<Self::Node> {
         if !self.is_root_valid() {
@@ -135,7 +148,7 @@ impl <H: Hasher> MerkleTree for MerkleTreeAppendOnly<H> {
         self.nodes.last().cloned()
     }
 
-    fn proof<T: AsRef<[u8]>>(&mut self, leaf: &T) -> Option<Vec<Self::Node>> {
+    fn proof<T: AsRef<[u8]>>(&mut self, leaf: &T) -> Option<Self::Proof> {
         if self.is_empty() {
             return None;
         }
@@ -197,16 +210,8 @@ impl <H: Hasher> MerkleTree for MerkleTreeAppendOnly<H> {
         if !self.is_root_valid() {
             self.compute();
         }
-        let leaf_hash = H::hash(leaf);
-        if proof.is_empty() {
-            return self.nodes.len() == 1 && self.nodes[0] == leaf_hash;   
-        }
-        let mut accumulator = leaf_hash.clone();
-        for proof_component in proof.iter() {
-            accumulator = Self::pairwise_hash(&accumulator, proof_component);
-        }
         match self.root() {
-            Some(root) => accumulator == root,
+            Some(root) => Self::verify_from_root(&root, leaf, proof),
             None => false
         }
     }

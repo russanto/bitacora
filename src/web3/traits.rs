@@ -89,7 +89,7 @@ impl Blockchain {
 #[derive(Clone, Debug, Serialize)]
 pub enum MerkleTreeReceipt<MT: MerkleTree> {
     Root(MT::Node),
-    Proof(Vec<MT::Node>),
+    Proof(MT::Proof),
     Tree(MT)
 }
 
