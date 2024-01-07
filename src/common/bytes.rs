@@ -2,8 +2,10 @@ use std::{convert::TryInto, fmt::Debug, fmt::Display};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use hex::FromHexError;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use serde::de::{self, Unexpected, Visitor};
 use sha2::digest::{generic_array::GenericArray, typenum::U32};
+use std::fmt;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd)]
 pub struct Bytes32(pub [u8; 32]);
@@ -20,6 +22,42 @@ impl Serialize for Bytes32 {
         S: Serializer,
     {
         serialize_as_hex(self, serializer)
+    }
+}
+
+struct Bytes32Visitor;
+
+impl<'de> Visitor<'de> for Bytes32Visitor {
+    type Value = Bytes32;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string starting with 0x followed by 64 hexadecimal characters")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        if value.starts_with("0x") && value.len() == 66 {
+            let bytes = match hex::decode(&value[2..]) {
+                Ok(bytes) => bytes,
+                Err(_) => return Err(E::custom("invalid hexadecimal")),
+            };
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes);
+            Ok(Bytes32(arr))
+        } else {
+            Err(E::custom("string does not start with 0x or has an incorrect length"))
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Bytes32 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(Bytes32Visitor)
     }
 }
 
@@ -122,11 +160,37 @@ where
     serializer.serialize_str(&hex_string)
 }
 
-pub fn serialize_as_b64<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize_b64<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
     T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
 {
     let hex_string = STANDARD.encode(value.as_ref());
     serializer.serialize_str(&hex_string)
+}
+
+pub fn deserialize_b64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct Base64Visitor;
+
+    impl<'de> Visitor<'de> for Base64Visitor {
+        type Value = Vec<u8>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a Base64 encoded string")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            STANDARD.decode(value).map_err(|_err| {
+                E::invalid_value(Unexpected::Str(value), &self)
+            })
+        }
+    }
+
+    deserializer.deserialize_str(Base64Visitor)
 }
