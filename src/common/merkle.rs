@@ -415,10 +415,7 @@ mod test {
     fn test_merkle_tree_with_odd_elements() {
         let values = vec!["a", "b", "c", "d", "e"];
         let expected_root = "1dd0d2a6ae466d665cb26e1a31f07c57ae5df7d2bc559cd5826d417be9141a5d";
-        let leaves_to_prove = vec![
-            Keccak256::hash("b"),
-            Keccak256::hash("e")
-        ];
+        let leaves_to_prove = vec!["b", "e"];
         let expected_proofs = vec![
             vec![
                 Bytes32::try_from("3ac225168df54212a25c1c01fd35bebfea408fdac2e31ddd6f80a4bbf9a5f1cb").unwrap(),
@@ -458,10 +455,7 @@ mod test {
     fn test_merkle_tree_with_even_elements() {
         let values = vec!["a", "b", "c", "d", "e", "f"];
         let expected_root = "9012f1e18a87790d2e01faace75aaaca38e53df437cdce2c0552464dda4af49c";
-        let leaves_to_prove = vec![
-            Keccak256::hash("c"),
-            Keccak256::hash("f")
-        ];
+        let leaves_to_prove = vec!["c", "f"];
         let expected_proofs = vec![
             vec![
                 Bytes32::try_from("f1918e8562236eb17adc8502332f4c9c82bc14e19bfc0aa10ab674ff75b3d2f3").unwrap(),
@@ -514,7 +508,7 @@ mod test {
         );
         assert!(mt.is_root_valid(), "Root is flagged as invalid with no tree modification");
         assert_eq!(mt.nodes.len(), values.len()*2-1, "Merkle Tree has more nodes than expected");
-        assert!(mt.verify(&expected_root, &Vec::<Bytes32>::new()));
+        assert!(mt.verify(&values[0], &Vec::<Bytes32>::new()));
     }
 
     #[test]
