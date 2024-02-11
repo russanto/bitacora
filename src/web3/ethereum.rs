@@ -1,6 +1,7 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use axum::http::Uri;
 use ethers::signers::Signer;
 use ethers::prelude::JsonRpcClient;
 use ethers::{
@@ -40,7 +41,6 @@ pub struct EthereumTimestamper<M: Middleware, P: JsonRpcClient> {
 }
 
 fn generate_bitacora_contract_info() -> (ethers::abi::Abi, ethers::types::Bytes) {
-
     let contract_base_path = BitacoraConfiguration::get_web3_contract_base_dir();
     let contract_path = Path::new(&contract_base_path);
     let compiled = Solc::default().compile_source(contract_path).unwrap();
@@ -48,17 +48,17 @@ fn generate_bitacora_contract_info() -> (ethers::abi::Abi, ethers::types::Bytes)
     (abi, bytecode)
 }
 
-pub fn new_ethereum_timestamper<M: Middleware, P: JsonRpcClient>(middleware: M, provider: Provider<P>, address: &str) -> Result<EthereumTimestamper<M, P>, Web3Error> {
+pub async fn deploy_new_bitacora_contract_instance<P: JsonRpcClient>(provider: Provider<P>) -> Address {
+    let (abi, bytecode) = generate_bitacora_contract_info();
+    let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), Arc::new(provider));
+    let contract = factory.deploy(()).unwrap().send().await.unwrap();
+    contract.address()
+}
+
+pub fn new_ethereum_timestamper<M: Middleware, P: JsonRpcClient>(middleware: M, provider: Provider<P>, address: Address) -> Result<EthereumTimestamper<M, P>, Web3Error> {
     let client = Arc::new(middleware);
     let provider = Arc::new(provider);
 
-    let address: Address = match address.parse() {
-        Ok(address) => address,
-        Err(err) =>  {
-            println!("{}", err);
-            return Err(Web3Error::BadInputData(String::from("Address")))
-        }
-    };
     let contract = EthBitacoraContract::new(address, client);
 
     Ok(EthereumTimestamper {
@@ -68,20 +68,13 @@ pub fn new_ethereum_timestamper<M: Middleware, P: JsonRpcClient>(middleware: M, 
     })
 }
 
-pub fn new_ethereum_timestamper_from_http(endpoint: &str, address: &str) -> Result<EthereumTimestamper<Provider<Http>, Http>, Web3Error> {
+pub fn new_ethereum_timestamper_from_http(endpoint: &str, address: Address) -> Result<EthereumTimestamper<Provider<Http>, Http>, Web3Error> {
     let provider = match Provider::<Http>::try_from(endpoint) {
         Ok(provider) => provider.interval(Duration::from_millis(100u64)),
         Err(_) => return Err(Web3Error::ProviderConnectionFailed)
     };
     let client = Arc::new(provider);
 
-    let address: Address = match address.parse() {
-        Ok(address) => address,
-        Err(err) =>  {
-            println!("{}", err);
-            return Err(Web3Error::BadInputData(String::from("Address")))
-        }
-    };
     let contract = EthBitacoraContract::new(address, client.clone());
 
     Ok(EthereumTimestamper {
@@ -117,7 +110,7 @@ pub async fn new_ethereum_timestamper_from_devnode() -> (EthereumTimestamper<Arc
     let timestamper = new_ethereum_timestamper(
         client,
         provider,
-        hex::encode(contract.address()).as_str(),
+        contract.address(),
     );
     if timestamper.is_err() {
         panic!("Error creating timestamp");
@@ -125,14 +118,14 @@ pub async fn new_ethereum_timestamper_from_devnode() -> (EthereumTimestamper<Arc
     (timestamper.unwrap(), anvil)
 }
 
-pub async fn new_ethereum_timestamper_from_url_with_sk(url: &str, sk: &str) -> Result<EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>, Web3Error> {
+pub async fn new_ethereum_timestamper_from_url_with_sk(url: &Uri, sk: &str) -> Result<EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>, Web3Error> {
 
     let (abi, bytecode) = generate_bitacora_contract_info();
     
     // 2. instantiate wallet
     let wallet: LocalWallet = sk.parse::<LocalWallet>().unwrap();
     // 3. connect to the network
-    let provider = Provider::<Http>::try_from(url).unwrap();
+    let provider = Provider::<Http>::try_from(url.to_string()).unwrap();
     let chain_id = match provider.get_chainid().await {
         Ok(chain_id) => chain_id,
         Err(_) => return Err(Web3Error::ProviderConnectionFailed)
@@ -148,16 +141,37 @@ pub async fn new_ethereum_timestamper_from_url_with_sk(url: &str, sk: &str) -> R
     // 6. deploy it with the constructor arguments
     let contract = factory.deploy(()).unwrap().send().await.unwrap();
 
-    let provider = Provider::<Http>::try_from(url).unwrap().interval(Duration::from_millis(10u64));
+    let provider = Provider::<Http>::try_from(url.to_string()).unwrap().interval(Duration::from_millis(10u64));
     let timestamper = new_ethereum_timestamper(
         client,
         provider,
-        hex::encode(contract.address()).as_str(),
+        contract.address(),
     );
     if timestamper.is_err() {
         panic!("Error creating timestamp");
     }
     Ok(timestamper.unwrap())
+}
+
+pub async fn new_ethereum_timestamper_from_http_addr_sk(url: &Uri, addr: Address, sk: &str) -> Result<EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>, Web3Error> {
+    let provider = Provider::<Http>::try_from(url.to_string()).unwrap();
+    let chain_id = match provider.get_chainid().await {
+        Ok(chain_id) => chain_id,
+        Err(_) => return Err(Web3Error::ProviderConnectionFailed)
+    };
+
+    let wallet: LocalWallet = sk.parse::<LocalWallet>().unwrap();
+    let client = SignerMiddleware::new(provider, wallet.with_chain_id(chain_id.as_u64()));
+    let client = Arc::new(client);
+
+    let contract = EthBitacoraContract::new(addr, client.clone());
+
+    let provider = Provider::<Http>::try_from(url.to_string()).unwrap().interval(Duration::from_millis(10u64));
+    new_ethereum_timestamper(
+        client,
+        provider,
+        contract.address(),
+    )
 }
 
 impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTimestamper<M, P>{
@@ -167,11 +181,11 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTime
         Ok(Device { id: result.0, pk: PublicKey::from(result.1), web3: Option::None })
     }
 
-    // pub async fn get_dataset(&self, id: String, device_id: String) -> Result<<<EthereumTimestamper<M, P> as Timestamper>::MerkleTree as MerkleTree>::Root, Box<dyn std::error::Error>> {
-    //     let dataset_response = self.contract.get_dataset(id, device_id);
-    //     let result = dataset_response.call().await?;
-    //     Ok(Bytes32(result))
-    // }
+    pub async fn get_dataset(&self, id: String, device_id: String) -> Result<<<EthereumTimestamper<M, P> as Timestamper>::MerkleTree as MerkleTree>::Node, Box<dyn std::error::Error>> {
+        let dataset_response = self.contract.get_dataset(id, device_id);
+        let result = dataset_response.call().await?;
+        Ok(Bytes32(result))
+    }
 }
 
 #[async_trait]
@@ -257,3 +271,15 @@ impl <M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper 
         Ok(x.clone())
     }
 }
+
+// TODO 
+//pub struct EthereumTimestamperFactory {
+//     http: Option<Uri>,
+//     contract_address: Option<Address>,
+//     private_key: Option<String>
+// }
+
+// impl EthereumTimestamperFactory {
+//     pub fn create(&self) -> EthereumTimestamper<>
+// }
+

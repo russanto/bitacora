@@ -4,7 +4,7 @@ use axum::{
 };
 use clap::Parser;
 use state::bitacora::Bitacora;
-use web3::{ethereum::new_ethereum_timestamper_from_url_with_sk, traits::Timestamper};
+use web3::{ethereum::new_ethereum_timestamper_from_url_with_sk, ethereum::new_ethereum_timestamper_from_http_addr_sk, traits::Timestamper};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -17,6 +17,7 @@ pub mod state;
 pub mod storage;
 pub mod web3;
 
+use configuration::BitacoraConfiguration as Conf;
 use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data, post_verify_flight_data };
 use storage::{in_memory::InMemoryStorage, storage::FullStorage};
 
@@ -29,9 +30,30 @@ async fn main() {
 
     // cli params
     let args = cli_args::CLIArgs::parse();
-    configuration::BitacoraConfiguration::from_cli_args(&args);
+    match Conf::from_cli_args(args).err() {
+        Some(err) => panic!("{:?}", err),
+        _ => ()
+    }
 
-    let timestamper = new_ethereum_timestamper_from_url_with_sk(&args.web3, &args.private_key).await.unwrap();
+    let private_key = match Conf::get_web3_signer() {
+        Some(sk) => sk,
+        None => panic!("Private key signer is only supported. Please provide one.")
+    };
+
+
+
+    let maybe_contract_addr = Conf::get_web3_contract_address();
+    let timestamper = match maybe_contract_addr {
+        Some(addr) => new_ethereum_timestamper_from_http_addr_sk(
+            &Conf::get_web3_uri(),
+            addr,
+            &private_key
+        ).await.unwrap(),
+        None => new_ethereum_timestamper_from_url_with_sk(
+            &Conf::get_web3_uri(),
+            &private_key
+        ).await.unwrap()
+    };
 
     let shared_bitacora = Arc::new(
         Bitacora::new(
