@@ -3,10 +3,11 @@ use std::sync::RwLock;
 
 use sha2::{Digest, Sha256};
 
-use crate::state::entities::{Device, FlightData, Dataset, DeviceId, FlightDataId, DatasetId};
+use crate::configuration::BitacoraConfiguration;
+use crate::state::entities::{Device, FlightData, Dataset, DeviceId, Entity, FlightDataId, DatasetId};
 
 use super::errors::Error;
-use super::storage::{FullStorage, DatasetStorage, DeviceStorage, FlightDataStorage};
+use super::storage::{FullStorage, DeviceStorage, FlightDataStorage};
 
 #[derive(Default)]
 pub struct InMemoryStorage {
@@ -16,6 +17,28 @@ pub struct InMemoryStorage {
     datasets_flight_datas: RwLock<HashMap<DatasetId, Vec<FlightDataId>>>,
     flight_data_dataset: RwLock<HashMap<FlightDataId, DatasetId>>,
     devices_datasets: RwLock<HashMap<DeviceId, Vec<DatasetId>>>
+}
+
+impl InMemoryStorage {
+    fn new_dataset_id() -> DatasetId {
+        let mut hasher = Sha256::new();
+        hasher.update(rand::random::<u64>().to_be_bytes());
+        hasher.update(rand::random::<u64>().to_be_bytes());
+        bs58::encode(hasher.finalize()).into_string()
+    }
+
+    fn increment_dataset_count(&self, ds_id: &DatasetId) -> Result<u32, Error> {
+        let mut datasets_write_access = self.datasets.write().unwrap();
+        let dataset = match datasets_write_access.get_mut(ds_id) {
+            Some(ds) => ds,
+            None => return Err(Error::NotFound(Entity::Dataset))
+        };
+        if dataset.count >= dataset.limit {
+            return Err(Error::Generic)
+        }
+        dataset.count += 1;
+        Ok(dataset.count)
+    }
 }
 
 impl DeviceStorage for InMemoryStorage {
@@ -29,7 +52,7 @@ impl DeviceStorage for InMemoryStorage {
         Ok(())
     }
 
-    fn set_device(&self, device: &Device) -> Result<bool, Error> {
+    fn update_device(&self, device: &Device) -> Result<bool, Error> {
         match self.devices.write().unwrap().insert(device.id.clone(), device.clone()) {
             Some(_) => Ok(true),
             None => {
@@ -39,53 +62,55 @@ impl DeviceStorage for InMemoryStorage {
         }
     }
 
-    fn get_device(&self, id: &DeviceId) -> Result<Option<Device>, Error> {
+    fn get_device(&self, id: &DeviceId) -> Result<Device, Error> {
         let acquire_read = self.devices.read().unwrap();
-        let result = acquire_read.get(id);
-        if result.is_some() {
-            Ok(Some(result.unwrap().clone()))
-        } else {
-            Ok(Option::None)
+        match acquire_read.get(id) {
+            Some(device) => Ok(device.to_owned()),
+            None => Err(Error::NotFound(Entity::Device))
         }
     }
 }
 
 impl FlightDataStorage for InMemoryStorage {
-    fn set_flight_data(&self, fd: &FlightData) -> Result<bool, Error> {
-        match self.fligth_data.write().unwrap().insert(fd.id.clone(), fd.clone()) {
-            Some(_) => Ok(true),
-            None => Ok(false)
-        }   
-    }
-
-    fn get_flight_data(&self, id: &FlightDataId) -> Result<Option<FlightData>, Error> {
-        let acquire_read = self.fligth_data.read().unwrap();
-        let result = acquire_read.get(id);
-        if result.is_some() {
-            Ok(Some(result.unwrap().clone()))
-        } else {
-            Ok(Option::None)
-        }   
-    }
-}
-
-impl DatasetStorage for InMemoryStorage {
-    fn add_flight_data(&self, ds_id: &DatasetId, fd: &FlightData) -> Result<(), Error> {
-        let mut wa_datasets = self.datasets.write().unwrap();
-        let mut wa_datasets_flight_datas = self.datasets_flight_datas.write().unwrap();
-        let mut wa_flight_data_dataset = self.flight_data_dataset.write().unwrap();
-        match wa_datasets_flight_datas.get_mut(ds_id) {
-            Some(vector) => {
-                vector.push(fd.id.clone());
-            },
-            None => return Err(Error::InconsistentRelatedData(String::from("Dataset"), String::from("FlightData")))
-        };
-        wa_flight_data_dataset.insert(fd.id.clone(), ds_id.clone());
-        match wa_datasets.get_mut(ds_id) {
-            Some(dataset) => dataset.count += 1,
-            None => unreachable!()
+    fn new_flight_data(&self, fd: &FlightData, device_id: &DeviceId) -> Result<Dataset, Error> {
+        // This ensure exclusive access on the new flight data process
+        let mut fd_write_access = self.fligth_data.write().unwrap();
+        if let Some(already_fd) = fd_write_access.insert(fd.id.clone(), fd.clone()) {
+            fd_write_access.insert(fd.id.clone(), already_fd);
+            return Err(Error::AlreadyExists);
         }
-        Ok(())
+        let mut dataset: Option<Dataset> = Option::None;
+        {
+            let devices_datasets_read_lock = self.devices_datasets.read().unwrap();
+            match devices_datasets_read_lock.get(device_id) {
+                Some(dataset_list) => match dataset_list.last() {
+                    Some(ds_id) => {
+                        let dataset_candidate = self.get_dataset(ds_id).unwrap();
+                        if dataset_candidate.count < dataset_candidate.limit {
+                            dataset = Some(dataset_candidate);
+                        }
+                    },
+                    None => ()
+                },
+                None => return Err(Error::NotFound(Entity::Device))
+            };
+        }
+        if dataset.is_none() {
+            dataset = Some(self.new_dataset(BitacoraConfiguration::get_dataset_default_count(), device_id).unwrap());
+        }
+        let mut dataset = dataset.unwrap();
+        //next line should never fail thanks to the fd_write_access lock
+        dataset.count = self.increment_dataset_count(&dataset.id).unwrap();
+        self.datasets_flight_datas.write().unwrap().entry(dataset.id.clone()).and_modify(|fd_list| fd_list.push(fd.id.clone()));
+        self.flight_data_dataset.write().unwrap().insert(fd.id.clone(), dataset.id.clone());
+        Ok(dataset)
+    }
+
+    fn get_flight_data(&self, id: &FlightDataId) -> Result<FlightData, Error> {
+        match self.fligth_data.read().unwrap().get(id) {
+            Some(fd) => Ok(fd.clone()),
+            None => Err(Error::NotFound(Entity::FlightData))
+        }
     }
 
     fn get_dataset_flight_datas(&self, ds_id: &DatasetId) -> Result<Vec<FlightData>, Error> {
@@ -93,7 +118,7 @@ impl DatasetStorage for InMemoryStorage {
         let read_access_fds = self.fligth_data.read().unwrap();
         let fd_ids = match read_access_cross_ds_fd.get(ds_id) {
             Some(fd_ids) => fd_ids,
-            None => return Err(Error::NotFound(String::from("Dataset")))
+            None => return Err(Error::NotFound(Entity::Dataset))
         };
         let mut fds = Vec::new();
         for fd_id in fd_ids {
@@ -108,34 +133,37 @@ impl DatasetStorage for InMemoryStorage {
         Ok(self.datasets.read().unwrap().get(ds_id.unwrap()).unwrap().clone())
     }
 
-    fn get_dataset(&self, id: &DatasetId) -> Result<Option<Dataset>, Error> {
-        Ok(self.datasets.read().unwrap().get(id).cloned())
-    }
-
-    fn set_dataset(&self, ds: &Dataset) -> Result<bool, Error> {
-        match self.datasets.write().unwrap().insert(ds.id.clone(), ds.clone()) {
-            Some(_) => Ok(true),
-            None => Ok(false)
+    fn get_dataset(&self, id: &DatasetId) -> Result<Dataset, Error> {
+        match self.datasets.read().unwrap().get(id) {
+            Some(ds) => Ok(ds.clone()),
+            None => Err(Error::NotFound(Entity::Dataset))
         }
     }
 
-    fn add_dataset(&self, ds: &Dataset, device_id: &DeviceId) -> Result<(), Error> {
-        let mut write_lock = self.datasets.write().unwrap();
-        match write_lock.insert(ds.id.clone(), ds.clone()) {
-            Some(old_dataset) => { //a dataset already exists with such ID this is an error
-                write_lock.insert(old_dataset.id.clone(), old_dataset); // restore the old dataset
-                Err(Error::AlreadyExists)
-            },
-            None => {
-                let mut write_access = self.devices_datasets.write().unwrap();
-                match write_access.get_mut(device_id) {
-                    Some(dataset_list) => dataset_list.push(ds.id.clone()),
-                    None => return Err(Error::FailedRelatingData(String::from("Dataset"), String::from("Device")))
-                }
-                self.datasets_flight_datas.write().unwrap().insert(ds.id.clone(), vec![]);
-                Ok(())
-            }
+    fn new_dataset(&self, limit: u32, device_id: &DeviceId) -> Result<Dataset, Error> {
+        let dataset = Dataset {
+            id: Self::new_dataset_id(),
+            limit,
+            count: 0,
+            web3: None
+        };
+        let mut datasets_write_lock = self.datasets.write().unwrap();
+        let mut devices_datasets_write_lock = self.devices_datasets.write().unwrap();
+        let mut datasets_flight_datas_write_lock = self.datasets_flight_datas.write().unwrap();
+        match devices_datasets_write_lock.get_mut(device_id) {
+            Some(dataset_list) => dataset_list.push(dataset.id.clone()),
+            None => return Err(Error::NotFound(Entity::Device))
         }
+        datasets_write_lock.insert(dataset.id.clone(), dataset.clone());
+        datasets_flight_datas_write_lock.insert(dataset.id.clone(), vec![]);
+        Ok(dataset)
+    }
+
+    fn update_dataset_web3(&self, ds: &Dataset) -> Result<(), Error> {
+        self.datasets.write().unwrap().entry(ds.id.clone()).and_modify(|dataset| {
+            dataset.web3 = ds.web3.clone();
+        });
+        Ok(())
     }
 
     fn get_latest_dataset(&self, device_id: &DeviceId) -> Result<Option<Dataset>, Error> {
@@ -144,21 +172,14 @@ impl DatasetStorage for InMemoryStorage {
                 match dataset_list.last() {
                     Some(dataset_id) => match self.datasets.read().unwrap().get(dataset_id) {
                         Some(dataset) => Ok(Some(dataset.clone())),
-                        None => Err(Error::NotFound(String::from("Latest Dataset Id does not have corresponding data")))
+                        None => panic!("Inconsistency on the InMemoryStorage. There is a dataset Id without its data")
                     },
                     None => Ok(Option::None)
                 }
                 
             },
-            None => Err(Error::NotFound(String::from("Device not found")))
+            None => Err(Error::NotFound(Entity::Device))
         }
-    }
-
-    fn new_dataset_id(&self) -> Result<DatasetId, Error> {
-        let mut hasher = Sha256::new();
-        hasher.update(rand::random::<u64>().to_be_bytes());
-        hasher.update(rand::random::<u64>().to_be_bytes());
-        Ok(bs58::encode(hasher.finalize()).into_string())
     }
 }
 

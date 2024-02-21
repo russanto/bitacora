@@ -2,7 +2,7 @@ use axum::{extract::{State, Path}, http::StatusCode, Json, response::{IntoRespon
 use serde::Serialize;
 
 use crate::state::entities::{FlightData, DatasetId};
-use crate::{storage::storage::{FlightDataStorage, FullStorage, DatasetStorage}, web3::traits::{Timestamper, Web3Info}, state::entities::{FlightDataId, LocalizationPoint}};
+use crate::{storage::storage::{FlightDataStorage, FullStorage}, web3::traits::{Timestamper, Web3Info}, state::entities::{FlightDataId, LocalizationPoint}};
 use crate::SharedBitacora;
 
 use super::errors::ErrorResponse;
@@ -23,13 +23,8 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
         Err(_) => return ErrorResponse::bad_input("id", Some("Can't decode Id")).into_response()
     };
     let fd = match state.get_flight_data(&fd_id) {
-        Ok(query_result) => {
-            match query_result {
-                Some(fd) => fd,
-                None => return ErrorResponse::not_found("FlightData").into_response()
-            }
-        },
-        Err(_) => return ErrorResponse::storage_error().into_response()
+        Ok(fd) => fd,
+        Err(err) => return ErrorResponse::from(err).into_response()
     };
     let dataset = match state.get_flight_data_dataset(&fd_id) {
         Ok(dataset) => dataset,

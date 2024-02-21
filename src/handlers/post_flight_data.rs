@@ -6,7 +6,7 @@ use axum::{
 use base64::{DecodeError, Engine as _, engine::general_purpose::STANDARD};
 use serde::{ Deserialize, Serialize };
 
-use crate::{ SharedBitacora, state::{errors::BitacoraError, entities::FlightDataId}, storage::storage::FullStorage, web3::traits::Timestamper};
+use crate::{ SharedBitacora, state::entities::FlightDataId, storage::storage::FullStorage, web3::traits::Timestamper};
 use crate::state::entities::{ FlightData, LocalizationPoint, };
 
 use super::errors::ErrorResponse;
@@ -69,13 +69,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
             id: flight_data.id.into(),
             dataset_id: dataset.id
         }).into_response(),
-        Err(new_fd_error) => match new_fd_error {
-            BitacoraError::AlreadyExists(entity, id) => ErrorResponse::already_exists(entity, id).into_response(),
-            BitacoraError::NotFound => ErrorResponse::not_found("Device").into_response(),
-            BitacoraError::StorageError(_) => ErrorResponse::storage_error().into_response(),
-            BitacoraError::Web3Error => ErrorResponse::web3_error().into_response(),
-            BitacoraError::BadId(_id_err) => ErrorResponse::bad_input("device_id", Some("Bad Device Id")).into_response() //this should be unreachable
-        }
+        Err(new_fd_error) => ErrorResponse::from(new_fd_error).into_response()
     }
 }
 

@@ -1,7 +1,8 @@
 use axum::{http::StatusCode, Json, response::IntoResponse};
 use serde::Serialize;
 
-use crate::state::{errors::BitacoraError, entities::Entity};
+use crate::state::errors::BitacoraError;
+use crate::storage::errors::Error as StorageError;
 
 
 #[derive(Debug)]
@@ -22,13 +23,13 @@ pub struct ErrorResponseBody {
 }
 
 impl ErrorResponse {
-    pub fn already_exists(entity: Entity, id: String) -> Self {
+    pub fn already_exists() -> Self {
         ErrorResponse {
             status: StatusCode::BAD_REQUEST,
             body: ErrorResponseBody {
                 code: 1001,
-                message: format!("{} already exists", entity),
-                description: format!("Resource {} already exists", id)
+                message: format!("Resource already exists"),
+                description: format!("Resource already exists")
             }
         }
     }
@@ -87,11 +88,20 @@ impl IntoResponse for ErrorResponse {
 impl From<BitacoraError> for ErrorResponse {
     fn from(value: BitacoraError) -> Self {
         match value {
-            BitacoraError::AlreadyExists(entity, id) => ErrorResponse::already_exists(entity, id),
             BitacoraError::Web3Error => ErrorResponse::web3_error(),
-            BitacoraError::NotFound => ErrorResponse::not_found(&String::from("CHANGE ME")),
-            BitacoraError::StorageError(_) => ErrorResponse::storage_error(),
-            BitacoraError::BadId(_id_err) => ErrorResponse::bad_input("id", None)
+            BitacoraError::StorageError(err) => err.into(),
+            BitacoraError::BadId(_id_err) => ErrorResponse::bad_input("id", None),
+            BitacoraError::CompletedWithError(_) => unimplemented!()
+        }
+    }
+}
+
+impl From<StorageError> for ErrorResponse {
+    fn from(value: StorageError) -> Self {
+        match value {
+            StorageError::NotFound(entity) => ErrorResponse::not_found(entity.to_string().as_str()),
+            StorageError::AlreadyExists => ErrorResponse::already_exists(),
+            _ => ErrorResponse::storage_error()
         }
     }
 }

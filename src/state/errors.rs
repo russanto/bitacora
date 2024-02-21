@@ -1,8 +1,6 @@
 use crate::storage::errors::Error as StorageError;
 use crate::web3::traits::Web3Error;
 
-use super::entities::Entity;
-
 #[derive(Debug)]
 pub enum IdError {
     Length(usize, usize),
@@ -12,11 +10,18 @@ pub enum IdError {
 
 #[derive(Debug)]
 pub enum BitacoraError {
-    NotFound,
-    AlreadyExists(Entity, String),
     StorageError(StorageError),
     Web3Error,
-    BadId(IdError)
+    BadId(IdError),
+    CompletedWithError(Box<BitacoraError>)
+}
+
+impl BitacoraError {
+    pub fn wrap_with_completed(err: BitacoraError) -> BitacoraError {
+        BitacoraError::CompletedWithError(
+            Box::new(err)
+        )
+    }
 }
 
 impl From<StorageError> for BitacoraError {

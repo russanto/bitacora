@@ -1,8 +1,7 @@
 use axum::{extract::{State, Path}, http::StatusCode, Json, response::{IntoResponse, Response}};
 
-use crate::{storage::storage::{DatasetStorage, FullStorage}, web3::traits::Timestamper};
+use crate::{storage::storage::{FlightDataStorage, FullStorage}, web3::traits::Timestamper};
 use crate::SharedBitacora;
-
 use super::errors::ErrorResponse;
 
 pub async fn handler<S: FullStorage, T: Timestamper>(
@@ -10,12 +9,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     State(state): State<SharedBitacora<S, T>>
 ) -> Response {
     match state.get_dataset(&id) {
-        Ok(query_result) => {
-            match query_result {
-                Some(dataset) => (StatusCode::OK, Json(dataset)).into_response(),
-                None => ErrorResponse::not_found("Dataset").into_response()
-            }
-        },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(())).into_response()
+        Ok(dataset) =>  (StatusCode::OK, Json(dataset)).into_response(),
+        Err(error) => ErrorResponse::from(error).into_response()
     }
 }

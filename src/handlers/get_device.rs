@@ -10,12 +10,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     State(state): State<SharedBitacora<S, T>>
 ) -> Response {
     match state.get_device(&id) {
-        Ok(query_result) => {
-            match query_result {
-                Some(device) => (StatusCode::OK, Json(device)).into_response(),
-                None => ErrorResponse::not_found("Device").into_response()
-            }
-        },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(())).into_response()
+        Ok(device) => (StatusCode::OK, Json(device)).into_response(),
+        Err(err) => ErrorResponse::from(err).into_response()
     }
 }
