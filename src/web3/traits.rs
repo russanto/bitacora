@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ethers::types::H256;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::common::prelude::*;
 use crate::state::entities::{Device, Dataset, FlightData};
@@ -36,7 +36,7 @@ pub trait Timestamper {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum TxStatus {
     Submitted,
     Included,
@@ -57,7 +57,7 @@ impl From<TxHash> for H256 {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct Tx {
     #[serde(serialize_with = "serialize_as_hex")]
     pub hash: TxHash,
@@ -70,7 +70,7 @@ impl Tx {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(tag = "type")]
 pub enum Blockchain {
     EVM { chain: String }
@@ -86,7 +86,7 @@ impl Blockchain {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum MerkleTreeReceipt<MT: MerkleTree> {
     Root(MT::Node),
     Proof(MT::Proof),
@@ -95,7 +95,7 @@ pub enum MerkleTreeReceipt<MT: MerkleTree> {
 
 pub type MerkleTreeOZReceipt = MerkleTreeReceipt<MerkleTreeOZ>;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct Web3Info {
     pub blockchain: Blockchain,
     pub tx: Tx,

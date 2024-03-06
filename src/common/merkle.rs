@@ -1,18 +1,18 @@
 use std::{borrow::BorrowMut, cell::RefCell};
 
 use ethers::utils::keccak256;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::bytes::Bytes32;
 
 pub trait Hasher {
 
-    type ReturnType: AsRef<[u8]> + Clone + Eq + PartialOrd + Serialize;
+    type ReturnType: AsRef<[u8]> + Clone + Eq + PartialOrd + Serialize + DeserializeOwned;
 
     fn hash<T: AsRef<[u8]>>(data: T) -> Self::ReturnType;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Keccak256 {}
 
 impl Hasher for Keccak256 {
@@ -33,7 +33,7 @@ pub trait MerkleTree {
     fn verify<E: AsRef<[u8]>>(&mut self, leaf: &E, proof: &[Self::Node]) -> bool;
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct MerkleTreeAppendOnly<H>
 where
     H: Hasher
@@ -410,6 +410,17 @@ mod test {
     use crate::common::prelude::{Hasher, Bytes32};
 
     use super::{MerkleTree, MerkleTreeAppendOnly, Keccak256};
+
+    impl MerkleTreeAppendOnly<Keccak256> {
+        fn test_instance() -> Self {
+            let values = vec!["a", "b", "c", "d", "e", "f"];
+            let mut mt = MerkleTreeAppendOnly::<Keccak256>::new();
+            values.iter().for_each(|v| {
+                mt.append(v);
+            });
+            mt
+        }
+    }
 
     #[test]
     fn test_merkle_tree_with_odd_elements() {

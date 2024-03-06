@@ -1,5 +1,60 @@
 mod tests {
+
+    use p256::ecdsa::{SigningKey, VerifyingKey};
+    use p256::EncodedPoint;
+    use rand::rngs::OsRng;
+
+    use crate::state::entities::DeviceId;
     use crate::{state::{entities::{Device, PublicKey, FlightData, LocalizationPoint, FlightDataId, Dataset}, bitacora::{Bitacora, DATASET_DEFAULT_LIMIT}}, storage::in_memory::InMemoryStorage, web3::stub::EthereumStub};
+
+    fn generate_p256_key_pair() -> (SigningKey, VerifyingKey) {
+        // Generate a private key (for signing) using OsRng for randomness
+        let signing_key = SigningKey::random(&mut OsRng);
+    
+        // Derive the corresponding public key from the private key
+        let verifying_key = VerifyingKey::from(&signing_key);
+
+        (signing_key, verifying_key)
+    }
+
+    impl Device {
+        pub fn test_instance() -> Self {
+            let (_, pk) = generate_p256_key_pair();
+            let device_pk: PublicKey = pk.to_encoded_point(true).as_bytes()[1..].try_into().unwrap(); // true for compressed
+            Device::from(device_pk)
+        }
+    }
+
+    impl FlightData {
+        pub fn test_instance(device_id: &DeviceId) -> Self {
+            let timestamp = 1701305636123;
+            FlightData {
+                id: FlightDataId::new(timestamp, device_id),
+                signature: String::new(),
+                timestamp,
+                localization: LocalizationPoint {
+                    longitude: 14.425681,
+                    latitude: 40.820948
+                },
+                payload: Vec::new()
+            }
+        }
+
+        pub fn test_instance_list(n: u32) -> Vec<Self> {
+            let device = Device::test_instance();
+            let prototype = Self::test_instance(&device.id);
+            let mut flight_datas: Vec<FlightData> = Vec::new();
+            for i in 0..n {
+                let mut fd = prototype.clone();
+                fd.timestamp += 1000u64 * i as u64; // assume a FlightData object each second
+                fd.localization.latitude += 0.01 * i as f64; // just to change data
+                fd.localization.latitude += 0.01 * i as f64;
+                fd.id = FlightDataId::new(fd.timestamp, &device.id);
+                flight_datas.push(fd);
+            }
+            flight_datas
+        }
+    }
 
     fn new_bitacora_from_stubs() -> Bitacora<InMemoryStorage, EthereumStub> {
         let storage_in_memory = InMemoryStorage::default();
@@ -10,29 +65,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_basic_flow_on_in_memory_storage() { //TODO: Why it panics with two equal FlightData ?
-        let device_pk: PublicKey = "0x1234567890123456789012345678901234567890123456789012345678901234".try_into().unwrap();
-        let mut device = Device::from(device_pk);
-
-        let flight_data_prototype = FlightData {
-            id: FlightDataId::default(),
-            signature: String::new(),
-            timestamp: 1701305636123,
-            localization: LocalizationPoint {
-                longitude: 14.425681,
-                latitude: 40.820948
-            },
-            payload: Vec::new()
-        };
-        let mut flight_datas: Vec<FlightData> = Vec::new();
-
-        for i in 0..DATASET_DEFAULT_LIMIT*2 {
-            let mut fd = flight_data_prototype.clone();
-            fd.timestamp += 1000u64 * i as u64; // assume a FlightData object each second
-            fd.localization.latitude += 0.01 * i as f64; // just to change data
-            fd.localization.latitude += 0.01 * i as f64;
-            fd.id = FlightDataId::new(fd.timestamp, &device.id);
-            flight_datas.push(fd);
-        }
+        let mut device = Device::test_instance();
+        let flight_datas = FlightData::test_instance_list(DATASET_DEFAULT_LIMIT*2);
 
         let bitacora = new_bitacora_from_stubs();
         

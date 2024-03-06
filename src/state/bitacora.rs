@@ -119,7 +119,7 @@ impl <S: FullStorage, T: Timestamper> DeviceStorage for SharedBitacora<S, T> {
         self.storage.get_device(id)
     }
 
-    fn update_device(&self, device: &Device) -> Result<bool, StorageError> {
+    fn update_device(&self, device: &Device) -> Result<(), StorageError> {
         self.storage.update_device(device)
     }
 }

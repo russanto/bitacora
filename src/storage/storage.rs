@@ -6,7 +6,7 @@ use super::errors::Error;
 
 /// Trait defining storage operations for devices.
 pub trait DeviceStorage {
-    /// Creates a new device.
+    /// Creates a new device. The Id of the Device is provided as input and an error is returned if it already exists.
     ///
     /// # Arguments
     ///
@@ -25,8 +25,8 @@ pub trait DeviceStorage {
     ///
     /// # Returns
     ///
-    /// `Result<bool, Error>` - Ok(true) if the device was successfully updated, Ok(false) if no updates were necessary, Err if an error occurred.
-    fn update_device(&self, device: &Device) -> Result<bool, Error>;
+    /// `Result<bool, Error>` - Ok(()) if the device was successfully updated, Err if an error occurred.
+    fn update_device(&self, device: &Device) -> Result<(), Error>;
 
     /// Retrieves a device by its ID.
     ///

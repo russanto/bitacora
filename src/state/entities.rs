@@ -17,7 +17,7 @@ use super::errors::{BitacoraError, IdError};
 pub const ID_BYTE_LENGTH: u8 = 16;
 pub const FLIGHT_DATA_ID_PREFIX: u8 = 1;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Entity {
     Dataset,
     Device,
@@ -60,7 +60,7 @@ impl From<[u8; 32]> for PublicKey {
 
 pub type DeviceId = String;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Device {
     pub id: DeviceId,
     #[serde(serialize_with = "serialize_as_hex")]
@@ -80,7 +80,7 @@ impl From<PublicKey> for Device {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 pub struct LocalizationPoint {
     pub longitude: f64,
     pub latitude: f64,
@@ -113,10 +113,35 @@ impl Default for FlightDataId {
     }
 }
 
+impl Display for FlightDataId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", String::from(self.clone()))
+    }
+}
+
 impl TryFrom<String> for FlightDataId {
     type Error = BitacoraError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        match bs58::decode(value).into_vec() {
+            Ok(id_bytes) => {
+                id_bytes.try_into().map(|bytes32| {
+                    FlightDataId(bytes32)
+                }).map_err(|err| {
+                    match err {
+                        Bytes32DecodeError::BadLength(len) => BitacoraError::BadId(IdError::Length(len, 32))
+                    }
+                })
+            },
+            Err(_) => Err(BitacoraError::BadId(IdError::Unknown))
+        }
+    }
+}
+
+impl TryFrom<&String> for FlightDataId {
+    type Error = BitacoraError;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
         match bs58::decode(value).into_vec() {
             Ok(id_bytes) => {
                 id_bytes.try_into().map(|bytes32| {
@@ -160,7 +185,7 @@ where
         type Value = FlightDataId;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a Base64 encoded string representing 32 bytes")
+            formatter.write_str("a Base58 encoded string representing 32 bytes")
         }
 
         fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
@@ -182,12 +207,14 @@ where
     deserializer.deserialize_str(Base58Visitor)
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+pub type Timestamp = u64;
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct FlightData {
     #[serde(deserialize_with = "deserialize_b58_to_flight_data_id", serialize_with = "serialize_b64")]
     pub id: FlightDataId,
     pub signature: String,
-    pub timestamp: u64,
+    pub timestamp: Timestamp,
     pub localization: LocalizationPoint,
     #[serde(deserialize_with = "deserialize_b64", serialize_with = "serialize_b64")]
     pub payload: Vec<u8>
@@ -206,11 +233,30 @@ impl FlightData {
 }
 
 pub type DatasetId = String;
+pub type DatasetCounter = u32;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct Dataset {
     pub id: DatasetId,
     pub limit: u32,
     pub count: u32,
     pub web3: Option<Web3Info>
+}
+
+impl Dataset {
+    pub fn dataset_id(device_id: &DeviceId, device_dataset_counter: DatasetCounter) -> DatasetId {
+        let mut hasher = Sha256::new();
+        hasher.update(device_id);
+        hasher.update(device_dataset_counter.to_be_bytes());
+        bs58::encode(hasher.finalize()).into_string()
+    }
+
+    pub fn new(device_id: DeviceId, device_dataset_counter: DatasetCounter, limit: u32) -> Self {
+        Dataset {
+            id: Self::dataset_id(&device_id, device_dataset_counter),
+            limit,
+            count: 0,
+            web3: None
+        }
+    }
 }

@@ -1,16 +1,28 @@
 use std::{convert::TryInto, fmt::Debug, fmt::Display};
+use std::fmt;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use hex::FromHexError;
 use serde::{Deserialize, Serialize, Serializer, Deserializer};
 use serde::de::{self, Unexpected, Visitor};
 use sha2::digest::{generic_array::GenericArray, typenum::U32};
-use std::fmt;
+use rand::Rng;
+
+use crate::state::errors::BitacoraError;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd)]
 pub struct Bytes32(pub [u8; 32]);
 
 impl Bytes32 {
+
+    // Do not use for crypto purpose
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        let mut arr = [0u8; 32];
+        rng.fill(&mut arr[..]);
+        Self(arr)
+    }
+
     pub fn to_string(&self) -> String {
         String::from(self)
     }
@@ -82,6 +94,21 @@ impl From<Bytes32> for String {
 impl From<&Bytes32> for String {
     fn from(value: &Bytes32) -> Self {
         hex::encode(value.0)
+    }
+}
+
+impl TryFrom<&[u8]> for Bytes32 {
+
+    type Error = BitacoraError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() != 32 {
+            println!("{:?}", value.len());
+            return Err(BitacoraError::Web3Error) //TODO: just a placeholder, need to be changed
+        }
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(value);
+        Ok(Bytes32(bytes))
     }
 }
 

@@ -19,9 +19,28 @@ mod tests {
         solc::Solc, utils::AnvilInstance
     };
 
-    use crate::{web3::{ethereum::{new_ethereum_timestamper_from_devnode, EthereumTimestamper}, traits::Timestamper, stub::EthereumStub}, state::entities::Device, state::entities::{PublicKey, Dataset}};
+    use crate::{state::entities::{Dataset, Device, FlightData, PublicKey}, web3::{ethereum::{new_ethereum_timestamper_from_devnode, EthereumTimestamper}, stub::EthereumStub, traits::{Blockchain, MerkleTreeOZReceipt, Timestamper, Tx, TxStatus, Web3Info}}};
 
     use crate::common::prelude::*;
+
+    impl Tx {
+        pub fn test_instance_confirmed() -> Tx {
+            Tx {
+                hash: Bytes32::random(),
+                status: TxStatus::Confirmed
+            }
+        }
+    }
+
+    impl Web3Info {
+        pub fn test_instance_no_merkle() -> Web3Info {
+            Web3Info {
+                blockchain: Blockchain::ethereum(),
+                tx: Tx::test_instance_confirmed(),
+                merkle_receipt: None
+            }
+        }
+    }
 
     #[tokio::test]
     async fn test_register_device() {
@@ -49,8 +68,7 @@ mod tests {
     async fn test_register_dataset() {
         let (timestamper, _anvil) = new_ethereum_timestamper_from_devnode().await;
         
-        let device_pk: PublicKey = "0x1234567890123456789012345678901234567890123456789012345678901234".try_into().unwrap();
-        let device = Device::from(device_pk);
+        let device = Device::test_instance();
 
         let _ = timestamper.register_device(&device).await;
 
@@ -60,18 +78,32 @@ mod tests {
             id: String::from("Some Id"),
             limit: 10,
             count: 10,
-            merkle_root: Some(EthereumStub::get_random_tx_hash()),
             web3: None
         };
 
-        match timestamper.register_dataset(&dataset, &device.id).await {
+        let fds = FlightData::test_instance_list(10);
+
+        match timestamper.register_dataset(&dataset, &device.id, &fds).await {
             Err(err) => {
                 println!("{:?}", err);
                 panic!("Dataset registration failed");
             },
-            Ok(_) => {
-                let gotten_merkle_root = timestamper.get_dataset(dataset.id, device.id).await.unwrap();
-                assert_eq!(gotten_merkle_root, dataset.merkle_root.unwrap())
+            Ok(ref mut web3info) => {
+                if let Some(ref mut merkle_receipt) = web3info.merkle_receipt {
+                    match merkle_receipt {
+                        MerkleTreeOZReceipt::Tree(ref mut mt) => {
+                            if let Some(root) = mt.root() {
+                                let gotten_merkle_root = timestamper.get_dataset(dataset.id, device.id).await.unwrap();
+                                assert_eq!(gotten_merkle_root, root);
+                            } else {
+                                unreachable!()
+                            }
+                        },
+                        _ => unreachable!()
+                    }
+                } else {
+                    unreachable!()
+                }
             }
         }
     }

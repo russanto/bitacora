@@ -52,13 +52,10 @@ impl DeviceStorage for InMemoryStorage {
         Ok(())
     }
 
-    fn update_device(&self, device: &Device) -> Result<bool, Error> {
+    fn update_device(&self, device: &Device) -> Result<(), Error> {
         match self.devices.write().unwrap().insert(device.id.clone(), device.clone()) {
-            Some(_) => Ok(true),
-            None => {
-                self.devices_datasets.write().unwrap().insert(device.id.clone(), vec![]);
-                Ok(false)
-            }
+            Some(_) => Ok(()),
+            None => Err(Error::NotFound(Entity::Device))
         }
     }
 
