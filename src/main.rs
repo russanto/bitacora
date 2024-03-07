@@ -19,7 +19,7 @@ pub mod web3;
 
 use configuration::BitacoraConfiguration as Conf;
 use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data, post_verify_flight_data };
-use storage::{in_memory::InMemoryStorage, storage::FullStorage};
+use storage::{in_memory::InMemoryStorage, redis::RedisStorage, storage::FullStorage};
 
 type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
 
@@ -30,7 +30,7 @@ async fn main() {
 
     // cli params
     let args = cli_args::CLIArgs::parse();
-    match Conf::from_cli_args(args).err() {
+    match Conf::from_cli_args(args.clone()).err() {
         Some(err) => panic!("{:?}", err),
         _ => ()
     }
@@ -57,7 +57,7 @@ async fn main() {
 
     let shared_bitacora = Arc::new(
         Bitacora::new(
-            InMemoryStorage::default(),
+            RedisStorage::new(Conf::get_redis_connection_string().as_str()).unwrap(),
             timestamper
         )
     );

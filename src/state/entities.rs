@@ -1,7 +1,6 @@
-use std::{fmt::Display, hash};
+use std::fmt::Display;
 
-use ethers::utils::keccak256;
-use hex::FromHexError;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{self, Unexpected, Visitor};
 use sha2::{ Digest, Sha256 };

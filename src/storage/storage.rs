@@ -15,7 +15,7 @@ pub trait DeviceStorage {
     /// # Returns
     ///
     /// `Result<(), Error>` - Ok if the device was successfully created, Err otherwise.
-    fn new_device(&self, device: &Device) -> Result<(), Error>;
+    fn new_device(&self, device: &Device, dataset_limit: u32) -> Result<(), Error>;
 
     /// Updates an existing device.
     ///

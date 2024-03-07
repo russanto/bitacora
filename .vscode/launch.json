@@ -14,9 +14,9 @@
                 ]
             },
             "env": {
-                "RUST_LOG": "trace"
+                "RUST_LOG": "info"
             },
-            "args": ["--dataset-count", "2", "--contracts-base", "${workspaceFolder}/contracts/contracts", "--private-key", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"]
+            "args": ["--dataset-limit", "2", "--contracts-base", "${workspaceFolder}/contracts/contracts", "--private-key", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"]
         }
     ]
 }

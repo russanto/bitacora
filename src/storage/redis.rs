@@ -14,7 +14,7 @@ use crate::common::prelude::Bytes32;
 use crate::configuration::BitacoraConfiguration as Conf;
 use crate::state::entities::{Dataset, DatasetCounter, DatasetId, Device, DeviceId, Entity, FlightData, FlightDataId, Timestamp};
 
-use super::storage::{DeviceStorage, FlightDataStorage};
+use super::storage::{DeviceStorage, FlightDataStorage, FullStorage};
 use super::errors::Error;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -23,7 +23,7 @@ type RedisKey = String;
 
 const PREFIX_DEVICE_KEY: &str = "device";
 
-struct RedisStorage {
+pub struct RedisStorage {
     conn: Arc<Mutex<redis::Connection>>,
 }
 
@@ -54,12 +54,12 @@ impl RedisStorage {
         format!("{}:{}", "dataset_flight_data", id)
     }
 
-    fn get_device_fields(device: &Device) -> Vec<(&str, String)> {
+    fn get_device_fields(device: &Device, dataset_limit: u32) -> Vec<(&str, String)> {
         let mut fields = vec![
             ("id", device.id.to_string()),
             ("public_key", device.pk.to_string()),
             ("flight_data_count", "0".to_string()),
-            ("dataset_limit", "10".to_string())
+            ("dataset_limit", dataset_limit.to_string()) //TODO: make it configurable
         ];
         if device.web3.is_some() {
             fields.push(("web3", serde_json::to_string(&device.web3).unwrap())) //TODO: replace with something more efficient
@@ -167,9 +167,9 @@ impl RedisStorage {
 }
 
 impl DeviceStorage for RedisStorage {
-    fn new_device(&self, device: &Device) -> Result<()> {
+    fn new_device(&self, device: &Device, dataset_limit: u32) -> Result<()> {
         let device_key = Self::get_device_key(&device.id);
-        let fields = Self::get_device_fields(device);
+        let fields = Self::get_device_fields(device, dataset_limit);
         //Note: The following is ok only in the assumption this is the only connection accessing Redis.
         let mut cnx_lock = self.conn.lock().unwrap();
         if cnx_lock.exists(device_key.clone())? {
@@ -223,6 +223,12 @@ impl FlightDataStorage for RedisStorage {
         let device_key = Self::get_device_key(device_id);
         let device_fd_key = Self::get_device_flight_data_key(device_id);
         let mut conn_lock = self.conn.lock().unwrap();
+        if !conn_lock.exists(device_key.clone())? {
+            return Err(Error::NotFound(Entity::Device));
+        }
+        if conn_lock.exists(fd_key.clone())? {
+            return Err(Error::AlreadyExists);
+        }
         let dataset_limit: u32 = conn_lock.hget(device_key.clone(), "dataset_limit")?;
         let fd_count: u32 = conn_lock.hincr(device_key.clone(), "flight_data_count", 1)?;
         let dataset = match fd_count % dataset_limit {
@@ -232,10 +238,13 @@ impl FlightDataStorage for RedisStorage {
                 Self::no_lock_create_dataset(&mut conn_lock, &dataset, device_id)?;
                 dataset
             },
-            _ => { //Existing dataset
+            value => { //Existing dataset
                 let dataset_key = conn_lock.hget(device_key.clone(), "current_dataset")?;
                 let mut dataset = Self::no_lock_get_dataset(&mut conn_lock, dataset_key)?;
-                dataset.count = fd_count % dataset_limit;
+                dataset.count = match value {
+                    0 => dataset_limit,
+                    _ => value
+                };
                 dataset.limit = dataset_limit;
                 dataset
             }
@@ -298,6 +307,8 @@ impl FlightDataStorage for RedisStorage {
     }
 }
 
+impl FullStorage for RedisStorage {}
+
 impl From<RedisError> for Error {
     fn from(value: RedisError) -> Self {
         Error::Generic
@@ -309,12 +320,13 @@ mod tests {
 
     use redis::Commands;
 
-    use crate::state::entities::{Device, DeviceId, Dataset, FlightData, FlightDataId, PublicKey};
-    use crate::storage::in_memory::InMemoryStorage;
+    use crate::state::entities::{Device, FlightData};
     use crate::storage::errors::Error as StorageError;
     use crate::storage::redis::RedisStorage;
     use crate::storage::storage::{ DeviceStorage, FlightDataStorage };
     use crate::web3::traits::Web3Info;
+
+    const DEFAULT_DATASET_LIMIT: u32 = 10;
 
     fn get_storage_instance() -> RedisStorage {
         RedisStorage::new("redis://localhost:6379").unwrap()
@@ -324,7 +336,7 @@ mod tests {
     fn test_new_device() {
         let storage = get_storage_instance();
         let device = Device::test_instance();
-        assert!(storage.new_device(&device).is_ok());
+        assert!(storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok());
         let device_exists: bool = storage.conn.lock().unwrap().exists(RedisStorage::get_device_key(&device.id)).unwrap();
         assert!(device_exists);
     }
@@ -333,8 +345,8 @@ mod tests {
     fn test_new_device_duplicate() {
         let storage = get_storage_instance();
         let device = Device::test_instance();
-        assert!(storage.new_device(&device).is_ok());
-        match storage.new_device(&device) {
+        assert!(storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok());
+        match storage.new_device(&device, DEFAULT_DATASET_LIMIT) {
             Ok(_) => panic!("Duplicated Device was added instead of being rejected"),
             Err(err) => assert!(err == StorageError::AlreadyExists)
         }
@@ -344,7 +356,7 @@ mod tests {
     fn test_new_device_and_get() {
         let storage = get_storage_instance();
         let device = Device::test_instance();
-        assert!(storage.new_device(&device).is_ok(), "Could not add device");
+        assert!(storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok(), "Could not add device");
         let gotten_device = storage.get_device(&device.id);
         assert!(gotten_device.is_ok(), "Could not get device");
         assert_eq!(device, gotten_device.unwrap(), "New device and gotten one are different");
@@ -354,7 +366,7 @@ mod tests {
     fn test_device_update_and_get() {
         let storage = get_storage_instance();
         let mut device = Device::test_instance();
-        let new_device_result = storage.new_device(&device);
+        let new_device_result = storage.new_device(&device, DEFAULT_DATASET_LIMIT);
         assert!(new_device_result.is_ok(), "Could not create a Device");
         device.web3 = Some(Web3Info::test_instance_no_merkle());
         assert!(storage.update_device(&device).is_ok(), "Could not update the Device");
@@ -368,7 +380,7 @@ mod tests {
         let storage = get_storage_instance();
         let device = Device::test_instance();
         // Creates a new test device
-        let new_device_result = storage.new_device(&device);
+        let new_device_result = storage.new_device(&device, DEFAULT_DATASET_LIMIT);
         assert!(new_device_result.is_ok(), "Could not create a Device");
         
         let fd = FlightData::test_instance(&device.id);

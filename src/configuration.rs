@@ -1,5 +1,4 @@
 use axum::http::Uri;
-use base64::read;
 use ethers::types::Address;
 use once_cell::sync::Lazy;
 use std::sync::RwLock;
@@ -8,7 +7,8 @@ use crate::{cli_args::CLIArgs, web3::traits::Web3Error};
 
 pub struct BitacoraConfiguration {
     pub web3: Web3Configuration,
-    pub dataset_default_count: u32
+    pub default_dataset_limit: u32,
+    pub redis_connection_string: String
 }
 
 impl BitacoraConfiguration {
@@ -25,8 +25,8 @@ impl BitacoraConfiguration {
         Ok(())
     }
 
-    pub fn get_dataset_default_count() -> u32 {
-        BitacoraConfiguration::instance().read().unwrap().dataset_default_count
+    pub fn get_default_dataset_limit() -> u32 {
+        BitacoraConfiguration::instance().read().unwrap().default_dataset_limit
     }
 
     pub fn get_web3_uri() -> Uri {
@@ -44,6 +44,10 @@ impl BitacoraConfiguration {
     pub fn get_web3_signer() -> Option<String> {
         BitacoraConfiguration::instance().read().unwrap().web3.signer.clone()
     }
+
+    pub fn get_redis_connection_string() -> String {
+        BitacoraConfiguration::instance().read().unwrap().redis_connection_string.clone()
+    }
 }
 
 impl Default for BitacoraConfiguration {
@@ -55,7 +59,8 @@ impl Default for BitacoraConfiguration {
                 signer: None,
                 contracts_base_dir: String::from(".")
             },
-            dataset_default_count: 0
+            default_dataset_limit: 0,
+            redis_connection_string: String::from("redis://localhost:6379")
         }
     
     }
@@ -67,7 +72,8 @@ impl TryFrom<CLIArgs> for BitacoraConfiguration {
 
     fn try_from(value: CLIArgs) -> Result<Self, Self::Error> {
         Ok(BitacoraConfiguration {
-            dataset_default_count: value.dataset_count,
+            default_dataset_limit: value.dataset_limit,
+            redis_connection_string: value.redis.clone(),
             web3: value.try_into()?,
         })  
     }

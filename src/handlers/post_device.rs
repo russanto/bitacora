@@ -6,13 +6,15 @@ use axum::{
 
 use serde::Deserialize;
 
+use crate::Conf;
 use crate::{state::entities::{Device, PublicKey}, SharedBitacora, storage::storage::FullStorage, web3::traits::Timestamper};
 
 use super::errors::ErrorResponse;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct POSTDeviceRequest {
-    pk: String
+    pk: String,
+    dataset_limit: Option<u32>
 }
 
 pub enum POSTDeviceRequestError {
@@ -36,13 +38,17 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     State(state): State<SharedBitacora<S, T>>,
     Json(payload): Json<POSTDeviceRequest>
 ) -> Response {
-    let mut device = match Device::try_from(payload) {
+    let mut device = match Device::try_from(payload.clone()) {
         Ok(device) => device,
         Err(error) => match error {
             POSTDeviceRequestError::FailedPKDecoding => return ErrorResponse::bad_input("pk", Some("Failed to decode")).into_response()
         }
     };
-    match state.new_device(&mut device).await {
+    let dataset_limit = match payload.dataset_limit {
+        Some(limit) => limit,
+        None => Conf::get_default_dataset_limit()
+    };
+    match state.new_device(&mut device, dataset_limit).await {
         Ok(()) => (StatusCode::CREATED, Json(device)).into_response(),
         Err(error) => ErrorResponse::from(error).into_response()
     }

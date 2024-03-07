@@ -16,7 +16,8 @@ pub struct InMemoryStorage {
     datasets: RwLock<HashMap<DatasetId, Dataset>>,
     datasets_flight_datas: RwLock<HashMap<DatasetId, Vec<FlightDataId>>>,
     flight_data_dataset: RwLock<HashMap<FlightDataId, DatasetId>>,
-    devices_datasets: RwLock<HashMap<DeviceId, Vec<DatasetId>>>
+    devices_datasets: RwLock<HashMap<DeviceId, Vec<DatasetId>>>,
+    dataset_limits: RwLock<HashMap<DeviceId, u32>>
 }
 
 impl InMemoryStorage {
@@ -42,13 +43,14 @@ impl InMemoryStorage {
 }
 
 impl DeviceStorage for InMemoryStorage {
-    fn new_device(&self, device: &Device) -> Result<(), Error> {
+    fn new_device(&self, device: &Device, dataset_limit: u32) -> Result<(), Error> {
         let mut write_lock = self.devices.write().unwrap();
         if write_lock.contains_key(&device.id) {
             return Err(Error::AlreadyExists);
         }
         write_lock.insert(device.id.clone(), device.clone());
         self.devices_datasets.write().unwrap().insert(device.id.clone(), vec![]);
+        self.dataset_limits.write().unwrap().insert(device.id.clone(), dataset_limit);
         Ok(())
     }
 
@@ -93,7 +95,8 @@ impl FlightDataStorage for InMemoryStorage {
             };
         }
         if dataset.is_none() {
-            dataset = Some(self.new_dataset(BitacoraConfiguration::get_dataset_default_count(), device_id).unwrap());
+            let dataset_limit = self.dataset_limits.read().unwrap().get(device_id).unwrap().clone();
+            dataset = Some(self.new_dataset(dataset_limit, device_id).unwrap());
         }
         let mut dataset = dataset.unwrap();
         //next line should never fail thanks to the fd_write_access lock

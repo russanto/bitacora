@@ -34,12 +34,8 @@ where
     }
 
     pub async fn new_flight_data(&self, fd: &FlightData, device_id: &DeviceId) -> Result<Dataset, BitacoraError> {
-        info!(device_id = device_id, "Creating a new FlightData");
-        debug!(device_id = device_id, "Searching the supplied device");
-        let _ = self.storage.get_device(device_id)?;
-        debug!(flight_data_id = fd.id.to_string(), "Storing the FlightData");
         let mut dataset = self.storage.new_flight_data(fd, device_id)?;
-        debug!(device_id=device_id, flight_data_id=fd.id.to_string(), dataset_id=dataset.id, "Getting added dataset");
+        info!(device_id=device_id, flight_data_id=fd.id.to_string(), "Created new FlightData");
         if dataset.count == dataset.limit {
             // TODO: refactor to let it be asynchronous
             let fds = match self.storage.get_dataset_flight_datas(&dataset.id) {
@@ -50,6 +46,7 @@ where
                 Err(err) => return Err(BitacoraError::wrap_with_completed(err)),
                 _ => ()
             };
+            info!(dataset_id=dataset.id, device_id=device_id, "Timestamped Dataset");
             match self.storage.update_dataset_web3(&dataset) {
                 Err(err) => return Err(BitacoraError::wrap_with_completed(err.into())),
                 _ => ()
@@ -65,8 +62,8 @@ where
         Ok(ds)
     }
 
-    pub async fn new_device(&self, device: &mut Device) -> Result<(), BitacoraError> {
-        self.storage.new_device(&device)?;
+    pub async fn new_device(&self, device: &mut Device, dataset_limit: u32) -> Result<(), BitacoraError> {
+        self.storage.new_device(&device, dataset_limit)?;
         self.timestamp_device(device).await
     }
 
@@ -111,8 +108,8 @@ where
 }
 
 impl <S: FullStorage, T: Timestamper> DeviceStorage for SharedBitacora<S, T> {
-    fn new_device(&self, device: &Device) -> Result<(), StorageError> {
-        self.storage.new_device(device)
+    fn new_device(&self, device: &Device, dataset_limit: u32) -> Result<(), StorageError> {
+        self.storage.new_device(device, dataset_limit)
     }
 
     fn get_device(&self, id: &DeviceId) -> Result<Device, StorageError> {

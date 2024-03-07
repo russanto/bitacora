@@ -5,7 +5,9 @@ mod tests {
     use rand::rngs::OsRng;
 
     use crate::state::entities::DeviceId;
-    use crate::{state::{entities::{Device, PublicKey, FlightData, LocalizationPoint, FlightDataId, Dataset}, bitacora::{Bitacora, DATASET_DEFAULT_LIMIT}}, storage::in_memory::InMemoryStorage, web3::stub::EthereumStub};
+    use crate::{state::{entities::{Device, PublicKey, FlightData, LocalizationPoint, FlightDataId, Dataset}, bitacora::Bitacora}, storage::in_memory::InMemoryStorage, web3::stub::EthereumStub};
+
+    const DATASET_DEFAULT_LIMIT: u32 = 10;
 
     fn generate_p256_key_pair() -> (SigningKey, VerifyingKey) {
         // Generate a private key (for signing) using OsRng for randomness
@@ -71,7 +73,7 @@ mod tests {
         let bitacora = new_bitacora_from_stubs();
         
         // Create the device
-        if bitacora.new_device(&mut device).await.is_err() {
+        if bitacora.new_device(&mut device, DATASET_DEFAULT_LIMIT).await.is_err() {
             panic!("Failed adding a new Device");
         }
 
