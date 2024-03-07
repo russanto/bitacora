@@ -8,9 +8,17 @@ services:
             - RUST_LOG=info
         ports:
             - 3000:3000
-        command: ["--web3", "http://web3:8545", "--contracts-base", "/app/contracts/contracts", "--private-key", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"]
+        command: [
+            "--web3", "http://web3:8545",
+            "--contracts-base", "/app/contracts/contracts",
+            "--private-key", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+            "--redis", "redis://redis:6379",
+        ]
         depends_on:
             - web3
+            - redis
+    redis:
+        image: redis
     web3:
         image: ghcr.io/foundry-rs/foundry:nightly-5be158ba6dc7c798a6f032026fe60fc01686b33b
         environment:
