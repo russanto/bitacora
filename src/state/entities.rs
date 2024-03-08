@@ -1,13 +1,12 @@
 use std::fmt::Display;
 
-
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{self, Unexpected, Visitor};
-use sha2::{ Digest, Sha256 };
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use sha2::{Digest, Sha256};
 use std::fmt;
 
 use crate::common::bytes::Bytes32DecodeError;
-use crate::{web3::traits::Web3Info};
+use crate::web3::traits::Web3Info;
 
 use crate::common::prelude::*;
 
@@ -20,7 +19,7 @@ pub const FLIGHT_DATA_ID_PREFIX: u8 = 1;
 pub enum Entity {
     Dataset,
     Device,
-    FlightData
+    FlightData,
 }
 
 impl Display for Entity {
@@ -64,7 +63,7 @@ pub struct Device {
     pub id: DeviceId,
     #[serde(serialize_with = "serialize_as_hex")]
     pub pk: PublicKey,
-    pub web3: Option<Web3Info>
+    pub web3: Option<Web3Info>,
 }
 
 impl From<PublicKey> for Device {
@@ -74,7 +73,7 @@ impl From<PublicKey> for Device {
         Device {
             id: bs58::encode(hasher.finalize()).into_string(),
             pk: value.clone(),
-            web3: None
+            web3: None,
         }
     }
 }
@@ -123,16 +122,15 @@ impl TryFrom<String> for FlightDataId {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match bs58::decode(value).into_vec() {
-            Ok(id_bytes) => {
-                id_bytes.try_into().map(|bytes32| {
-                    FlightDataId(bytes32)
-                }).map_err(|err| {
-                    match err {
-                        Bytes32DecodeError::BadLength(len) => BitacoraError::BadId(IdError::Length(len, 32))
+            Ok(id_bytes) => id_bytes
+                .try_into()
+                .map(|bytes32| FlightDataId(bytes32))
+                .map_err(|err| match err {
+                    Bytes32DecodeError::BadLength(len) => {
+                        BitacoraError::BadId(IdError::Length(len, 32))
                     }
-                })
-            },
-            Err(_) => Err(BitacoraError::BadId(IdError::Unknown))
+                }),
+            Err(_) => Err(BitacoraError::BadId(IdError::Unknown)),
         }
     }
 }
@@ -142,16 +140,15 @@ impl TryFrom<&String> for FlightDataId {
 
     fn try_from(value: &String) -> Result<Self, Self::Error> {
         match bs58::decode(value).into_vec() {
-            Ok(id_bytes) => {
-                id_bytes.try_into().map(|bytes32| {
-                    FlightDataId(bytes32)
-                }).map_err(|err| {
-                    match err {
-                        Bytes32DecodeError::BadLength(len) => BitacoraError::BadId(IdError::Length(len, 32))
+            Ok(id_bytes) => id_bytes
+                .try_into()
+                .map(|bytes32| FlightDataId(bytes32))
+                .map_err(|err| match err {
+                    Bytes32DecodeError::BadLength(len) => {
+                        BitacoraError::BadId(IdError::Length(len, 32))
                     }
-                })
-            },
-            Err(_) => Err(BitacoraError::BadId(IdError::Unknown))
+                }),
+            Err(_) => Err(BitacoraError::BadId(IdError::Unknown)),
         }
     }
 }
@@ -191,14 +188,12 @@ where
         where
             E: de::Error,
         {
-            FlightDataId::try_from(String::from(value)).map_err(|err| {
-                match err {
-                    BitacoraError::BadId(id_err) => match id_err {
-                        IdError::Length(cur, exp) => E::invalid_length(cur, &self),
-                        _ => unimplemented!()
-                    },
-                    _ => unreachable!()
-                }
+            FlightDataId::try_from(String::from(value)).map_err(|err| match err {
+                BitacoraError::BadId(id_err) => match id_err {
+                    IdError::Length(cur, exp) => E::invalid_length(cur, &self),
+                    _ => unimplemented!(),
+                },
+                _ => unreachable!(),
             })
         }
     }
@@ -210,13 +205,16 @@ pub type Timestamp = u64;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct FlightData {
-    #[serde(deserialize_with = "deserialize_b58_to_flight_data_id", serialize_with = "serialize_b64")]
+    #[serde(
+        deserialize_with = "deserialize_b58_to_flight_data_id",
+        serialize_with = "serialize_b64"
+    )]
     pub id: FlightDataId,
     pub signature: String,
     pub timestamp: Timestamp,
     pub localization: LocalizationPoint,
     #[serde(deserialize_with = "deserialize_b64", serialize_with = "serialize_b64")]
-    pub payload: Vec<u8>
+    pub payload: Vec<u8>,
 }
 
 impl FlightData {
@@ -239,7 +237,7 @@ pub struct Dataset {
     pub id: DatasetId,
     pub limit: u32,
     pub count: u32,
-    pub web3: Option<Web3Info>
+    pub web3: Option<Web3Info>,
 }
 
 impl Dataset {
@@ -255,7 +253,7 @@ impl Dataset {
             id: Self::dataset_id(&device_id, device_dataset_counter),
             limit,
             count: 0,
-            web3: None
+            web3: None,
         }
     }
 }

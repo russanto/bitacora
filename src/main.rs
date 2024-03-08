@@ -1,10 +1,13 @@
 use axum::{
     routing::{get, post},
-    Router
+    Router,
 };
 use clap::Parser;
 use state::bitacora::Bitacora;
-use web3::{ethereum::new_ethereum_timestamper_from_url_with_sk, ethereum::new_ethereum_timestamper_from_http_addr_sk, traits::Timestamper};
+use web3::{
+    ethereum::new_ethereum_timestamper_from_http_addr_sk,
+    ethereum::new_ethereum_timestamper_from_url_with_sk, traits::Timestamper,
+};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -18,7 +21,10 @@ pub mod storage;
 pub mod web3;
 
 use configuration::BitacoraConfiguration as Conf;
-use handlers::{ get_dataset, get_device, get_flight_data, post_device, post_flight_data, post_verify_flight_data };
+use handlers::{
+    get_dataset, get_device, get_flight_data, post_device, post_flight_data,
+    post_verify_flight_data,
+};
 use storage::{in_memory::InMemoryStorage, redis::RedisStorage, storage::FullStorage};
 
 type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
@@ -32,35 +38,30 @@ async fn main() {
     let args = cli_args::CLIArgs::parse();
     match Conf::from_cli_args(args.clone()).err() {
         Some(err) => panic!("{:?}", err),
-        _ => ()
+        _ => (),
     }
 
     let private_key = match Conf::get_web3_signer() {
         Some(sk) => sk,
-        None => panic!("Private key signer is only supported. Please provide one.")
+        None => panic!("Private key signer is only supported. Please provide one."),
     };
-
-
 
     let maybe_contract_addr = Conf::get_web3_contract_address();
     let timestamper = match maybe_contract_addr {
-        Some(addr) => new_ethereum_timestamper_from_http_addr_sk(
-            &Conf::get_web3_uri(),
-            addr,
-            &private_key
-        ).await.unwrap(),
-        None => new_ethereum_timestamper_from_url_with_sk(
-            &Conf::get_web3_uri(),
-            &private_key
-        ).await.unwrap()
+        Some(addr) => {
+            new_ethereum_timestamper_from_http_addr_sk(&Conf::get_web3_uri(), addr, &private_key)
+                .await
+                .unwrap()
+        }
+        None => new_ethereum_timestamper_from_url_with_sk(&Conf::get_web3_uri(), &private_key)
+            .await
+            .unwrap(),
     };
 
-    let shared_bitacora = Arc::new(
-        Bitacora::new(
-            RedisStorage::new(Conf::get_redis_connection_string().as_str()).unwrap(),
-            timestamper
-        )
-    );
+    let shared_bitacora = Arc::new(Bitacora::new(
+        RedisStorage::new(Conf::get_redis_connection_string().as_str()).unwrap(),
+        timestamper,
+    ));
 
     // build our application with a route
     let app = Router::new()
@@ -71,7 +72,10 @@ async fn main() {
         // `POST /users` goes to `create_user`
         .route("/flight_data", post(post_flight_data::handler))
         .route("/flight_data/:id", get(get_flight_data::handler))
-        .route("/flight_data/:id/verify", post(post_verify_flight_data::handler))
+        .route(
+            "/flight_data/:id/verify",
+            post(post_verify_flight_data::handler),
+        )
         .route("/dataset/:id", get(get_dataset::handler))
         .with_state(shared_bitacora);
 

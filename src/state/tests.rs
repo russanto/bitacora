@@ -5,14 +5,21 @@ mod tests {
     use rand::rngs::OsRng;
 
     use crate::state::entities::DeviceId;
-    use crate::{state::{entities::{Device, PublicKey, FlightData, LocalizationPoint, FlightDataId, Dataset}, bitacora::Bitacora}, storage::in_memory::InMemoryStorage, web3::stub::EthereumStub};
+    use crate::{
+        state::{
+            bitacora::Bitacora,
+            entities::{Dataset, Device, FlightData, FlightDataId, LocalizationPoint, PublicKey},
+        },
+        storage::in_memory::InMemoryStorage,
+        web3::stub::EthereumStub,
+    };
 
     const DATASET_DEFAULT_LIMIT: u32 = 10;
 
     fn generate_p256_key_pair() -> (SigningKey, VerifyingKey) {
         // Generate a private key (for signing) using OsRng for randomness
         let signing_key = SigningKey::random(&mut OsRng);
-    
+
         // Derive the corresponding public key from the private key
         let verifying_key = VerifyingKey::from(&signing_key);
 
@@ -22,7 +29,9 @@ mod tests {
     impl Device {
         pub fn test_instance() -> Self {
             let (_, pk) = generate_p256_key_pair();
-            let device_pk: PublicKey = pk.to_encoded_point(true).as_bytes()[1..].try_into().unwrap(); // true for compressed
+            let device_pk: PublicKey = pk.to_encoded_point(true).as_bytes()[1..]
+                .try_into()
+                .unwrap(); // true for compressed
             Device::from(device_pk)
         }
     }
@@ -36,9 +45,9 @@ mod tests {
                 timestamp,
                 localization: LocalizationPoint {
                     longitude: 14.425681,
-                    latitude: 40.820948
+                    latitude: 40.820948,
                 },
-                payload: Vec::new()
+                payload: Vec::new(),
             }
         }
 
@@ -66,14 +75,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_basic_flow_on_in_memory_storage() { //TODO: Why it panics with two equal FlightData ?
+    async fn test_basic_flow_on_in_memory_storage() {
+        //TODO: Why it panics with two equal FlightData ?
         let mut device = Device::test_instance();
-        let flight_datas = FlightData::test_instance_list(DATASET_DEFAULT_LIMIT*2);
+        let flight_datas = FlightData::test_instance_list(DATASET_DEFAULT_LIMIT * 2);
 
         let bitacora = new_bitacora_from_stubs();
-        
+
         // Create the device
-        if bitacora.new_device(&mut device, DATASET_DEFAULT_LIMIT).await.is_err() {
+        if bitacora
+            .new_device(&mut device, DATASET_DEFAULT_LIMIT)
+            .await
+            .is_err()
+        {
             panic!("Failed adding a new Device");
         }
 
@@ -83,7 +97,7 @@ mod tests {
             let fd = flight_datas.get(i).unwrap();
             let ds = match bitacora.new_flight_data(&fd, &device.id).await {
                 Ok(ds) => ds,
-                Err(_) => panic!("Failed adding a new FlightData")
+                Err(_) => panic!("Failed adding a new FlightData"),
             };
 
             if ds.limit > ds.count {
@@ -95,11 +109,13 @@ mod tests {
             }
 
             if i % DATASET_DEFAULT_LIMIT as usize != 0 {
-                assert_eq!(previous_dataset.unwrap().id, ds.id, "New FlightData returned a different Dataset than expected");
+                assert_eq!(
+                    previous_dataset.unwrap().id,
+                    ds.id,
+                    "New FlightData returned a different Dataset than expected"
+                );
             }
             previous_dataset = Some(ds);
         }
-
-        
     }
 }

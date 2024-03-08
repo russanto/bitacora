@@ -30,7 +30,6 @@ pub struct CLIArgs {
     /// The Redis URL to connect to. Defaults to "redis://localhost:6379".
     #[arg(short, long, default_value_t = String::from("redis://localhost:6379"))]
     pub redis: String,
-
     // /// Whether to use in-memory storage instead of Redis.
     // #[arg(long)]
     // pub in_memory: bool,

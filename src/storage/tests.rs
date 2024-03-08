@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
 
-    use crate::state::entities::{Device, DeviceId, Dataset, FlightData, FlightDataId, PublicKey};
-    use crate::storage::in_memory::InMemoryStorage;
+    use crate::state::entities::{Dataset, Device, DeviceId, FlightData, FlightDataId, PublicKey};
     use crate::storage::errors::Error as StorageError;
-    use crate::storage::storage::{ DeviceStorage, FlightDataStorage };
+    use crate::storage::in_memory::InMemoryStorage;
+    use crate::storage::storage::{DeviceStorage, FlightDataStorage};
 
     const DEFAULT_DATASET_LIMIT: u32 = 10;
 
@@ -22,7 +22,7 @@ mod tests {
         assert!(storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok());
         match storage.new_device(&device, DEFAULT_DATASET_LIMIT) {
             Ok(_) => panic!("Duplicated Device was added instead of being rejected"),
-            Err(err) => assert!(err == StorageError::AlreadyExists)
+            Err(err) => assert!(err == StorageError::AlreadyExists),
         }
     }
 }

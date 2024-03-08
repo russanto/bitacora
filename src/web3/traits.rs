@@ -3,25 +3,33 @@ use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 
 use crate::common::prelude::*;
-use crate::state::entities::{Device, Dataset, FlightData};
+use crate::state::entities::{Dataset, Device, FlightData};
 
 #[derive(Debug)]
 pub enum Web3Error {
     ProviderConnectionFailed,
     SubmissionFailed,
-    BadInputData(String)
-} 
+    BadInputData(String),
+}
 
 #[async_trait]
 pub trait Timestamper {
-
     type MerkleTree: MerkleTree;
 
-    async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error> ;
-    async fn register_dataset(&self, dataset: &Dataset, device_id: &String, flight_datas: &[FlightData]) -> Result<Web3Info, Web3Error>;
+    async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error>;
+    async fn register_dataset(
+        &self,
+        dataset: &Dataset,
+        device_id: &String,
+        flight_datas: &[FlightData],
+    ) -> Result<Web3Info, Web3Error>;
     async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error>;
 
-    fn flight_data_web3_info(fd: &FlightData, flight_datas: &[FlightData], dataset_receipt: &Web3Info) -> Result<Web3Info, Web3Error> {
+    fn flight_data_web3_info(
+        fd: &FlightData,
+        flight_datas: &[FlightData],
+        dataset_receipt: &Web3Info,
+    ) -> Result<Web3Info, Web3Error> {
         let mut fd_mt = MerkleTreeOZ::new();
         for f in flight_datas {
             fd_mt.append(&f.to_bytes());
@@ -31,7 +39,7 @@ pub trait Timestamper {
         Ok(Web3Info {
             blockchain: dataset_receipt.blockchain.clone(),
             tx: dataset_receipt.tx.clone(),
-            merkle_receipt: Some(MerkleTreeOZReceipt::Proof(proof))
+            merkle_receipt: Some(MerkleTreeOZReceipt::Proof(proof)),
         })
     }
 }
@@ -40,7 +48,7 @@ pub trait Timestamper {
 pub enum TxStatus {
     Submitted,
     Included,
-    Confirmed
+    Confirmed,
 }
 
 pub type TxHash = Bytes32;
@@ -61,7 +69,7 @@ impl From<TxHash> for H256 {
 pub struct Tx {
     #[serde(serialize_with = "serialize_as_hex")]
     pub hash: TxHash,
-    pub status: TxStatus
+    pub status: TxStatus,
 }
 
 impl Tx {
@@ -73,16 +81,20 @@ impl Tx {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(tag = "type")]
 pub enum Blockchain {
-    EVM { chain: String }
+    EVM { chain: String },
 }
 
 impl Blockchain {
     pub fn ethereum() -> Blockchain {
-        Blockchain::EVM { chain: String::from("Ethereum") }
+        Blockchain::EVM {
+            chain: String::from("Ethereum"),
+        }
     }
 
     pub fn devnet() -> Blockchain {
-        Blockchain::EVM { chain: String::from("Devnet") }
+        Blockchain::EVM {
+            chain: String::from("Devnet"),
+        }
     }
 }
 
@@ -90,7 +102,7 @@ impl Blockchain {
 pub enum MerkleTreeReceipt<MT: MerkleTree> {
     Root(MT::Node),
     Proof(MT::Proof),
-    Tree(MT)
+    Tree(MT),
 }
 
 pub type MerkleTreeOZReceipt = MerkleTreeReceipt<MerkleTreeOZ>;
@@ -99,16 +111,23 @@ pub type MerkleTreeOZReceipt = MerkleTreeReceipt<MerkleTreeOZ>;
 pub struct Web3Info {
     pub blockchain: Blockchain,
     pub tx: Tx,
-    pub merkle_receipt: Option<MerkleTreeOZReceipt>
+    pub merkle_receipt: Option<MerkleTreeOZReceipt>,
 }
-
 
 impl Web3Info {
     pub fn new(blockchain: Blockchain, tx: Tx) -> Self {
-        Web3Info { blockchain, tx, merkle_receipt: None }
+        Web3Info {
+            blockchain,
+            tx,
+            merkle_receipt: None,
+        }
     }
 
     pub fn new_with_merkle(blockchain: Blockchain, tx: Tx, merkle: MerkleTreeOZReceipt) -> Self {
-        Web3Info { blockchain, tx, merkle_receipt: Some(merkle) }
+        Web3Info {
+            blockchain,
+            tx,
+            merkle_receipt: Some(merkle),
+        }
     }
 }

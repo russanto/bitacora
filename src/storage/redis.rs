@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::sync::{ Arc, Mutex, MutexGuard };
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 use redis::{Commands, RedisError, RedisResult, ToRedisArgs};
 use serde::{Deserialize, Serialize};
@@ -12,10 +12,13 @@ use tracing_subscriber::registry::Data;
 
 use crate::common::prelude::Bytes32;
 use crate::configuration::BitacoraConfiguration as Conf;
-use crate::state::entities::{Dataset, DatasetCounter, DatasetId, Device, DeviceId, Entity, FlightData, FlightDataId, Timestamp};
+use crate::state::entities::{
+    Dataset, DatasetCounter, DatasetId, Device, DeviceId, Entity, FlightData, FlightDataId,
+    Timestamp,
+};
 
-use super::storage::{DeviceStorage, FlightDataStorage, FullStorage};
 use super::errors::Error;
+use super::storage::{DeviceStorage, FlightDataStorage, FullStorage};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -59,7 +62,7 @@ impl RedisStorage {
             ("id", device.id.to_string()),
             ("public_key", device.pk.to_string()),
             ("flight_data_count", "0".to_string()),
-            ("dataset_limit", dataset_limit.to_string()) //TODO: make it configurable
+            ("dataset_limit", dataset_limit.to_string()), //TODO: make it configurable
         ];
         if device.web3.is_some() {
             fields.push(("web3", serde_json::to_string(&device.web3).unwrap())) //TODO: replace with something more efficient
@@ -72,9 +75,12 @@ impl RedisStorage {
             ("id", fd.id.to_string()),
             ("signature", fd.signature.to_string()),
             ("timestamp", fd.timestamp.to_string()),
-            ("localization", serde_json::to_string(&fd.localization).unwrap()),
+            (
+                "localization",
+                serde_json::to_string(&fd.localization).unwrap(),
+            ),
             ("payload", STANDARD.encode(fd.payload.as_slice())),
-            ("dataset", Self::get_dataset_key(ds_id))
+            ("dataset", Self::get_dataset_key(ds_id)),
         ]
     }
 
@@ -82,7 +88,7 @@ impl RedisStorage {
         let mut fields = vec![
             ("id", ds.id.clone()),
             ("device", Self::get_device_key(device_id)),
-            ("limit", ds.limit.to_string())
+            ("limit", ds.limit.to_string()),
         ];
         if ds.web3.is_some() {
             fields.push(("web3", serde_json::to_string(&ds.web3).unwrap())) //TODO: replace with something more efficient
@@ -90,15 +96,25 @@ impl RedisStorage {
         fields
     }
 
-    fn no_lock_create_dataset(conn: &mut MutexGuard<redis::Connection>, dataset: &Dataset, device_id: &DeviceId) -> Result<()> {
+    fn no_lock_create_dataset(
+        conn: &mut MutexGuard<redis::Connection>,
+        dataset: &Dataset,
+        device_id: &DeviceId,
+    ) -> Result<()> {
         let dataset_key = Self::get_dataset_key(&dataset.id);
         let device_key = Self::get_device_key(device_id);
-        conn.hset_multiple(dataset_key.clone(), &Self::get_dataset_fields(&dataset, device_id))?;
+        conn.hset_multiple(
+            dataset_key.clone(),
+            &Self::get_dataset_fields(&dataset, device_id),
+        )?;
         conn.hset(device_key, "current_dataset", dataset_key)?;
         Ok(())
     }
 
-    fn no_lock_get_flight_data(conn: &mut MutexGuard<redis::Connection>, key: RedisKey) -> Result<FlightData> {
+    fn no_lock_get_flight_data(
+        conn: &mut MutexGuard<redis::Connection>,
+        key: RedisKey,
+    ) -> Result<FlightData> {
         let flight_data_data: HashMap<String, String> = conn.hgetall(key)?;
         if flight_data_data.is_empty() {
             return Err(Error::NotFound(Entity::FlightData));
@@ -108,7 +124,7 @@ impl RedisStorage {
         }
         let id: FlightDataId = match flight_data_data.get("id").unwrap().try_into() {
             Ok(id) => id,
-            Err(_) => return Err(Error::MalformedData("id".to_string()))
+            Err(_) => return Err(Error::MalformedData("id".to_string())),
         };
         if !flight_data_data.contains_key("signature") {
             return Err(Error::MalformedData("signature".to_string()));
@@ -129,12 +145,18 @@ impl RedisStorage {
             id,
             signature: flight_data_data.get("signature").unwrap().clone(),
             timestamp: flight_data_data.get("timestamp").unwrap().parse().unwrap(),
-            localization: serde_json::from_str(flight_data_data.get("localization").unwrap()).unwrap(),
-            payload: STANDARD.decode(flight_data_data.get("payload").unwrap().as_bytes()).unwrap()
+            localization: serde_json::from_str(flight_data_data.get("localization").unwrap())
+                .unwrap(),
+            payload: STANDARD
+                .decode(flight_data_data.get("payload").unwrap().as_bytes())
+                .unwrap(),
         })
     }
 
-    fn no_lock_get_dataset(conn: &mut MutexGuard<redis::Connection>, key: RedisKey) -> Result<Dataset> {
+    fn no_lock_get_dataset(
+        conn: &mut MutexGuard<redis::Connection>,
+        key: RedisKey,
+    ) -> Result<Dataset> {
         let dataset_data: HashMap<String, String> = conn.hgetall(key)?;
         if dataset_data.is_empty() {
             return Err(Error::NotFound(Entity::Dataset));
@@ -153,17 +175,16 @@ impl RedisStorage {
             id: id.clone(),
             limit: dataset_data.get("limit").unwrap().parse().unwrap(),
             count: conn.scard(Self::get_dataset_flight_data_key(&id))?,
-            web3: None
+            web3: None,
         };
         match dataset_data.get("web3") {
             Some(serialized_web3) => {
                 dataset.web3 = serde_json::from_str(&serialized_web3).unwrap() //TODO: manage this error in case something gets corrupted outside
-            },
-            None => ()
+            }
+            None => (),
         };
         Ok(dataset)
     }
-
 }
 
 impl DeviceStorage for RedisStorage {
@@ -195,7 +216,11 @@ impl DeviceStorage for RedisStorage {
     }
 
     fn get_device(&self, id: &DeviceId) -> Result<Device> {
-        let device_data: HashMap<String, String> = self.conn.lock().unwrap().hgetall(Self::get_device_key(id))?;
+        let device_data: HashMap<String, String> = self
+            .conn
+            .lock()
+            .unwrap()
+            .hgetall(Self::get_device_key(id))?;
         if device_data.is_empty() {
             return Err(Error::NotFound(Entity::Device));
         }
@@ -204,14 +229,19 @@ impl DeviceStorage for RedisStorage {
         }
         let mut device = Device {
             id: id.clone(),
-            pk: device_data.get("public_key").unwrap().as_str().try_into().unwrap(),
-            web3: None
+            pk: device_data
+                .get("public_key")
+                .unwrap()
+                .as_str()
+                .try_into()
+                .unwrap(),
+            web3: None,
         };
         match device_data.get("web3") {
             Some(serialized_web3) => {
                 device.web3 = serde_json::from_str(&serialized_web3).unwrap() //TODO: manage this error in case something gets corrupted outside
-            },
-            None => ()
+            }
+            None => (),
         };
         Ok(device)
     }
@@ -232,45 +262,55 @@ impl FlightDataStorage for RedisStorage {
         let dataset_limit: u32 = conn_lock.hget(device_key.clone(), "dataset_limit")?;
         let fd_count: u32 = conn_lock.hincr(device_key.clone(), "flight_data_count", 1)?;
         let dataset = match fd_count % dataset_limit {
-            1 => { //New dataset
-                let mut dataset = Dataset::new(device_id.clone(), fd_count / dataset_limit, dataset_limit);
+            1 => {
+                //New dataset
+                let mut dataset =
+                    Dataset::new(device_id.clone(), fd_count / dataset_limit, dataset_limit);
                 dataset.count = 1;
                 Self::no_lock_create_dataset(&mut conn_lock, &dataset, device_id)?;
                 dataset
-            },
-            value => { //Existing dataset
+            }
+            value => {
+                //Existing dataset
                 let dataset_key = conn_lock.hget(device_key.clone(), "current_dataset")?;
                 let mut dataset = Self::no_lock_get_dataset(&mut conn_lock, dataset_key)?;
                 dataset.count = match value {
                     0 => dataset_limit,
-                    _ => value
+                    _ => value,
                 };
                 dataset.limit = dataset_limit;
                 dataset
             }
         };
         // FlightData may arrive out of order so need a dedicated set to match them with the dataset
-        conn_lock.sadd(Self::get_dataset_flight_data_key(&dataset.id), fd_key.clone())?;
+        conn_lock.sadd(
+            Self::get_dataset_flight_data_key(&dataset.id),
+            fd_key.clone(),
+        )?;
         let fields = Self::get_flight_data_fields(fd, &dataset.id);
         conn_lock.hset_multiple(fd_key, &fields)?;
-        conn_lock.zadd(device_fd_key, Self::get_flight_data_key(&fd.id), fd.timestamp)?;
+        conn_lock.zadd(
+            device_fd_key,
+            Self::get_flight_data_key(&fd.id),
+            fd.timestamp,
+        )?;
         Ok(dataset)
     }
-    
+
     fn get_flight_data(&self, id: &FlightDataId) -> Result<FlightData> {
         let fd_key = Self::get_flight_data_key(id);
         let mut conn_lock = self.conn.lock().unwrap();
         Self::no_lock_get_flight_data(&mut conn_lock, fd_key)
     }
-    
+
     fn new_dataset(&self, limit: u32, device_id: &DeviceId) -> Result<Dataset> {
         todo!()
     }
-    
+
     fn get_dataset(&self, id: &DatasetId) -> Result<Dataset> {
         Self::no_lock_get_dataset(&mut self.conn.lock().unwrap(), Self::get_dataset_key(id))
     }
-    
+
     fn update_dataset_web3(&self, ds: &Dataset) -> Result<()> {
         let ds_key = Self::get_dataset_key(&ds.id);
         if ds.web3.is_none() {
@@ -280,16 +320,20 @@ impl FlightDataStorage for RedisStorage {
         self.conn.lock().unwrap().hset(ds_key, "web3", web3_str)?;
         Ok(())
     }
-    
+
     fn get_latest_dataset(&self, device_id: &DeviceId) -> Result<Option<Dataset>> {
         let mut conn_lock = self.conn.lock().unwrap();
-        let dataset_key: String = conn_lock.hget(Self::get_device_key(device_id), "current_dataset")?;
+        let dataset_key: String =
+            conn_lock.hget(Self::get_device_key(device_id), "current_dataset")?;
         if dataset_key.is_empty() {
             return Err(Error::MalformedData("current_dataset".to_string()));
         }
-        Ok(Some(Self::no_lock_get_dataset(&mut conn_lock, dataset_key)?))
+        Ok(Some(Self::no_lock_get_dataset(
+            &mut conn_lock,
+            dataset_key,
+        )?))
     }
-    
+
     fn get_dataset_flight_datas(&self, ds_id: &DatasetId) -> Result<Vec<FlightData>> {
         let mut conn_lock = self.conn.lock().unwrap();
         let fd_keys: Vec<String> = conn_lock.smembers(Self::get_dataset_flight_data_key(ds_id))?;
@@ -299,7 +343,7 @@ impl FlightDataStorage for RedisStorage {
         }
         Ok(fds)
     }
-    
+
     fn get_flight_data_dataset(&self, fd_id: &FlightDataId) -> Result<Dataset> {
         let mut conn_lock = self.conn.lock().unwrap();
         let dataset_key: String = conn_lock.hget(Self::get_flight_data_key(fd_id), "dataset")?;
@@ -323,7 +367,7 @@ mod tests {
     use crate::state::entities::{Device, FlightData};
     use crate::storage::errors::Error as StorageError;
     use crate::storage::redis::RedisStorage;
-    use crate::storage::storage::{ DeviceStorage, FlightDataStorage };
+    use crate::storage::storage::{DeviceStorage, FlightDataStorage};
     use crate::web3::traits::Web3Info;
 
     const DEFAULT_DATASET_LIMIT: u32 = 10;
@@ -337,7 +381,12 @@ mod tests {
         let storage = get_storage_instance();
         let device = Device::test_instance();
         assert!(storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok());
-        let device_exists: bool = storage.conn.lock().unwrap().exists(RedisStorage::get_device_key(&device.id)).unwrap();
+        let device_exists: bool = storage
+            .conn
+            .lock()
+            .unwrap()
+            .exists(RedisStorage::get_device_key(&device.id))
+            .unwrap();
         assert!(device_exists);
     }
 
@@ -348,7 +397,7 @@ mod tests {
         assert!(storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok());
         match storage.new_device(&device, DEFAULT_DATASET_LIMIT) {
             Ok(_) => panic!("Duplicated Device was added instead of being rejected"),
-            Err(err) => assert!(err == StorageError::AlreadyExists)
+            Err(err) => assert!(err == StorageError::AlreadyExists),
         }
     }
 
@@ -356,10 +405,17 @@ mod tests {
     fn test_new_device_and_get() {
         let storage = get_storage_instance();
         let device = Device::test_instance();
-        assert!(storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok(), "Could not add device");
+        assert!(
+            storage.new_device(&device, DEFAULT_DATASET_LIMIT).is_ok(),
+            "Could not add device"
+        );
         let gotten_device = storage.get_device(&device.id);
         assert!(gotten_device.is_ok(), "Could not get device");
-        assert_eq!(device, gotten_device.unwrap(), "New device and gotten one are different");
+        assert_eq!(
+            device,
+            gotten_device.unwrap(),
+            "New device and gotten one are different"
+        );
     }
 
     #[test]
@@ -369,10 +425,17 @@ mod tests {
         let new_device_result = storage.new_device(&device, DEFAULT_DATASET_LIMIT);
         assert!(new_device_result.is_ok(), "Could not create a Device");
         device.web3 = Some(Web3Info::test_instance_no_merkle());
-        assert!(storage.update_device(&device).is_ok(), "Could not update the Device");
+        assert!(
+            storage.update_device(&device).is_ok(),
+            "Could not update the Device"
+        );
         let gotten_device = storage.get_device(&device.id);
         assert!(gotten_device.is_ok(), "Could not get the Device");
-        assert_eq!(device, gotten_device.unwrap(), "Updated Device and the gotten one are different")
+        assert_eq!(
+            device,
+            gotten_device.unwrap(),
+            "Updated Device and the gotten one are different"
+        )
     }
 
     #[test]
@@ -382,34 +445,74 @@ mod tests {
         // Creates a new test device
         let new_device_result = storage.new_device(&device, DEFAULT_DATASET_LIMIT);
         assert!(new_device_result.is_ok(), "Could not create a Device");
-        
+
         let fd = FlightData::test_instance(&device.id);
         let new_fd_result = storage.new_flight_data(&fd, &device.id);
-        assert!(new_fd_result.is_ok(), "Could not create a FlightData: {:?}", new_fd_result.err().unwrap());
-        
+        assert!(
+            new_fd_result.is_ok(),
+            "Could not create a FlightData: {:?}",
+            new_fd_result.err().unwrap()
+        );
+
         let gotten_fd = storage.get_flight_data(&fd.id);
-        assert!(gotten_fd.is_ok(), "Could not get the FlightData: {:?}", gotten_fd.err().unwrap());
-        assert_eq!(fd, gotten_fd.unwrap(), "New FlightData and the gotten one are different");
-        
+        assert!(
+            gotten_fd.is_ok(),
+            "Could not get the FlightData: {:?}",
+            gotten_fd.err().unwrap()
+        );
+        assert_eq!(
+            fd,
+            gotten_fd.unwrap(),
+            "New FlightData and the gotten one are different"
+        );
+
         let dataset = new_fd_result.unwrap();
         assert_eq!(dataset.count, 1, "The count of the dataset is not 1");
         assert_eq!(dataset.limit, 10, "The limit of the dataset is not 10");
-        assert!(dataset.web3.is_none(), "The dataset has a web3 info while it supposed not");
+        assert!(
+            dataset.web3.is_none(),
+            "The dataset has a web3 info while it supposed not"
+        );
 
         let latest_dataset = storage.get_latest_dataset(&device.id);
         assert!(latest_dataset.is_ok(), "Could not get the latest Dataset");
-        assert_eq!(Some(dataset.clone()), latest_dataset.unwrap(), "The latest Dataset is not the expected one");
+        assert_eq!(
+            Some(dataset.clone()),
+            latest_dataset.unwrap(),
+            "The latest Dataset is not the expected one"
+        );
 
         let gotten_dataset = storage.get_flight_data_dataset(&fd.id);
-        assert!(gotten_dataset.is_ok(), "Could not get the Dataset from the FlightData");
-        assert_eq!(dataset, gotten_dataset.unwrap(), "New Dataset and the gotten one are different");
+        assert!(
+            gotten_dataset.is_ok(),
+            "Could not get the Dataset from the FlightData"
+        );
+        assert_eq!(
+            dataset,
+            gotten_dataset.unwrap(),
+            "New Dataset and the gotten one are different"
+        );
 
         let gotten_dataset = storage.get_dataset(&dataset.id);
-        assert!(gotten_dataset.is_ok(), "Could not get the Dataset from the Dataset Id");
-        assert_eq!(dataset, gotten_dataset.unwrap(), "New Dataset and the gotten one are different");
+        assert!(
+            gotten_dataset.is_ok(),
+            "Could not get the Dataset from the Dataset Id"
+        );
+        assert_eq!(
+            dataset,
+            gotten_dataset.unwrap(),
+            "New Dataset and the gotten one are different"
+        );
 
         let gotten_fds = storage.get_dataset_flight_datas(&dataset.id);
-        assert!(gotten_fds.is_ok(), "Could not get the FlightDatas from the Dataset");
-        assert_eq!(vec![fd], gotten_fds.unwrap(), "New FlightData and the gotten one are different");
+        assert!(
+            gotten_fds.is_ok(),
+            "Could not get the FlightDatas from the Dataset"
+        );
+        assert_eq!(
+            vec![fd],
+            gotten_fds.unwrap(),
+            "New FlightData and the gotten one are different"
+        );
     }
 }

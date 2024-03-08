@@ -1,6 +1,6 @@
 // use std::sync::{Arc, RwLock};
 
-use crate::state::entities::{Device, FlightData, Dataset, DatasetId, DeviceId, FlightDataId};
+use crate::state::entities::{Dataset, DatasetId, Device, DeviceId, FlightData, FlightDataId};
 
 use super::errors::Error;
 
@@ -40,13 +40,12 @@ pub trait DeviceStorage {
     fn get_device(&self, id: &DeviceId) -> Result<Device, Error>;
 }
 
-
 /// Trait defining storage operations for flight data and datasets.
 pub trait FlightDataStorage {
     /// Adds new flight data for a specific device and returns the dataset ID it was added to.
     ///
     /// This function takes flight data and a device ID, adding the flight data to the appropriate dataset
-    /// associated with the device. It might create a new dataset if necessary or add to an existing one, 
+    /// associated with the device. It might create a new dataset if necessary or add to an existing one,
     /// depending on the implementation.
     ///
     /// # Arguments
@@ -144,7 +143,6 @@ pub trait FlightDataStorage {
     /// `Result<Dataset, Error>` - The associated dataset if found, or Err if an error occurred.
     fn get_flight_data_dataset(&self, fd_id: &FlightDataId) -> Result<Dataset, Error>;
 }
-
 
 pub trait FullStorage: DeviceStorage + FlightDataStorage {}
 

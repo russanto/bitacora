@@ -5,7 +5,7 @@ use crate::web3::traits::Web3Error;
 pub enum IdError {
     Length(usize, usize),
     Format(&'static str, &'static str),
-    Unknown
+    Unknown,
 }
 
 #[derive(Debug)]
@@ -13,14 +13,12 @@ pub enum BitacoraError {
     StorageError(StorageError),
     Web3Error,
     BadId(IdError),
-    CompletedWithError(Box<BitacoraError>)
+    CompletedWithError(Box<BitacoraError>),
 }
 
 impl BitacoraError {
     pub fn wrap_with_completed(err: BitacoraError) -> BitacoraError {
-        BitacoraError::CompletedWithError(
-            Box::new(err)
-        )
+        BitacoraError::CompletedWithError(Box::new(err))
     }
 }
 

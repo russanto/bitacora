@@ -1,2 +1,4 @@
+pub use super::bytes::{
+    deserialize_b64, deserialize_b64_to_bytes32, serialize_as_hex, serialize_b64, Bytes32,
+};
 pub use super::merkle::{Hasher, Keccak256, MerkleTree, MerkleTreeAppendOnly, MerkleTreeOZ};
-pub use super::bytes::{Bytes32, serialize_b64, serialize_as_hex, deserialize_b64, deserialize_b64_to_bytes32};

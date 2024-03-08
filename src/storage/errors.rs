@@ -8,5 +8,5 @@ pub enum Error {
     NotFound(Entity),
     AlreadyExists,
     NoOp,
-    Generic
+    Generic,
 }

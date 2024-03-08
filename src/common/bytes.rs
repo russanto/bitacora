@@ -1,12 +1,12 @@
-use std::{convert::TryInto, fmt::Debug, fmt::Display};
 use std::fmt;
+use std::{convert::TryInto, fmt::Debug, fmt::Display};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use hex::FromHexError;
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
-use serde::de::{self, Unexpected, Visitor};
-use sha2::digest::{generic_array::GenericArray, typenum::U32};
 use rand::Rng;
+use serde::de::{self, Unexpected, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use sha2::digest::{generic_array::GenericArray, typenum::U32};
 
 use crate::state::errors::BitacoraError;
 
@@ -14,7 +14,6 @@ use crate::state::errors::BitacoraError;
 pub struct Bytes32(pub [u8; 32]);
 
 impl Bytes32 {
-
     // Do not use for crypto purpose
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
@@ -59,7 +58,9 @@ impl<'de> Visitor<'de> for Bytes32Visitor {
             arr.copy_from_slice(&bytes);
             Ok(Bytes32(arr))
         } else {
-            Err(E::custom("string does not start with 0x or has an incorrect length"))
+            Err(E::custom(
+                "string does not start with 0x or has an incorrect length",
+            ))
         }
     }
 }
@@ -98,13 +99,12 @@ impl From<&Bytes32> for String {
 }
 
 impl TryFrom<&[u8]> for Bytes32 {
-
     type Error = BitacoraError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != 32 {
             println!("{:?}", value.len());
-            return Err(BitacoraError::Web3Error) //TODO: just a placeholder, need to be changed
+            return Err(BitacoraError::Web3Error); //TODO: just a placeholder, need to be changed
         }
         let mut bytes = [0u8; 32];
         bytes.copy_from_slice(value);
@@ -113,12 +113,11 @@ impl TryFrom<&[u8]> for Bytes32 {
 }
 
 impl TryFrom<&str> for Bytes32 {
-
     type Error = FromHexError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let value = if value.starts_with("0x") {
-            &value[2..]   
+            &value[2..]
         } else {
             value
         };
@@ -129,7 +128,6 @@ impl TryFrom<&str> for Bytes32 {
 }
 
 impl TryFrom<String> for Bytes32 {
-
     type Error = FromHexError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
@@ -147,16 +145,15 @@ impl From<GenericArray<u8, U32>> for Bytes32 {
 
 #[derive(Debug)]
 pub enum Bytes32DecodeError {
-    BadLength(usize)
+    BadLength(usize),
 }
 impl TryFrom<Vec<u8>> for Bytes32 {
-
     type Error = Bytes32DecodeError;
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         match value.try_into() {
             Ok(r) => Ok(Bytes32(r)),
-            Err(err) => Err(Bytes32DecodeError::BadLength(err.len()))
+            Err(err) => Err(Bytes32DecodeError::BadLength(err.len())),
         }
     }
 }
@@ -214,9 +211,9 @@ where
         where
             E: de::Error,
         {
-            STANDARD.decode(value).map_err(|_err| {
-                E::invalid_value(Unexpected::Str(value), &self)
-            })
+            STANDARD
+                .decode(value)
+                .map_err(|_err| E::invalid_value(Unexpected::Str(value), &self))
         }
     }
 
@@ -240,13 +237,13 @@ where
         where
             E: de::Error,
         {
-            STANDARD.decode(value).map_err(|_err| {
-                E::invalid_value(Unexpected::Str(value), &self)
-            })?.try_into().map_err(|err| {
-                match err {
-                    Bytes32DecodeError::BadLength(len) => E::invalid_length(len, &self)
-                }
-            })
+            STANDARD
+                .decode(value)
+                .map_err(|_err| E::invalid_value(Unexpected::Str(value), &self))?
+                .try_into()
+                .map_err(|err| match err {
+                    Bytes32DecodeError::BadLength(len) => E::invalid_length(len, &self),
+                })
         }
     }
 
