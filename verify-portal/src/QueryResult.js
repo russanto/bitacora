@@ -19,7 +19,10 @@ const QueryResult = () => {
             setQuerySuccess(data.web3.tx.hash);
         }
     })
-      .catch(error => console.error('Error fetching data:', error));
+      .catch(error => {
+        console.error('Error fetching data:', error)
+        setQuerySuccess(false);
+      });
   }, [id]);
 
   if (querySuccess === null) {
