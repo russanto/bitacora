@@ -19,8 +19,13 @@ services:
             - redis
     redis:
         image: redis
+        volumes:
+            - redis:/data
+        command: ["--save", "60", "1", "--loglevel", "warning"]
     web3:
         image: ghcr.io/foundry-rs/foundry:nightly-5be158ba6dc7c798a6f032026fe60fc01686b33b
         environment:
             - ANVIL_IP_ADDR=0.0.0.0
         command: ["anvil"]
+volumes:
+    redis:
