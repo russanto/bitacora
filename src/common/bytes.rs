@@ -190,8 +190,8 @@ where
     S: Serializer,
     T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
 {
-    let hex_string = STANDARD.encode(value.as_ref());
-    serializer.serialize_str(&hex_string)
+    let b64_string = STANDARD.encode(value.as_ref());
+    serializer.serialize_str(&b64_string)
 }
 
 pub fn deserialize_b64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>

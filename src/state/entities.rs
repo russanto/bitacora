@@ -201,13 +201,22 @@ where
     deserializer.deserialize_str(Base58Visitor)
 }
 
+pub fn serialize_b58<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: AsRef<[u8]>, // Ensure T can be referenced as a byte slice
+{
+    let b58_string = bs58::encode(value.as_ref()).into_string();
+    serializer.serialize_str(&b58_string)
+}
+
 pub type Timestamp = u64;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct FlightData {
     #[serde(
         deserialize_with = "deserialize_b58_to_flight_data_id",
-        serialize_with = "serialize_b64"
+        serialize_with = "serialize_b58"
     )]
     pub id: FlightDataId,
     pub signature: String,
