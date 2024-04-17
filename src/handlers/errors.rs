@@ -12,11 +12,14 @@ pub struct ErrorResponse {
     pub body: ErrorResponseBody,
 }
 
+type ErrorCode = u16;
+
 #[derive(Serialize)]
 pub struct ErrorResponseBody {
-    pub code: u16,
+    pub code: ErrorCode,
     pub message: String,
     pub description: String,
+    pub nested: Option<Box<ErrorResponseBody>>,
 }
 
 impl ErrorResponse {
@@ -27,6 +30,7 @@ impl ErrorResponse {
                 code: 1001,
                 message: format!("Resource already exists"),
                 description: format!("Resource already exists"),
+                nested: None,
             },
         }
     }
@@ -38,6 +42,7 @@ impl ErrorResponse {
                 code: 1002,
                 message: String::from("Resource not found"),
                 description: format!("The following resorce was not found: {}", what),
+                nested: None,
             },
         }
     }
@@ -52,6 +57,7 @@ impl ErrorResponse {
                     "The parameter produced the following error: {}",
                     reason.unwrap_or_default()
                 ),
+                nested: None,
             },
         }
     }
@@ -63,6 +69,7 @@ impl ErrorResponse {
                 code: 1003,
                 message: String::from("Error on internal data storage"),
                 description: format!("[TODO]A better description should be implemented"), //TODO: improve description
+                nested: None,
             },
         }
     }
@@ -72,8 +79,21 @@ impl ErrorResponse {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             body: ErrorResponseBody {
                 code: 1004,
-                message: String::from("Error submitting a web3 transaction"),
-                description: format!("[TODO]A better description should be implemented"), //TODO: improve description
+                message: String::from("Error with the web3 interaction"),
+                description: format!("The Web3 operation failed. Nested error should clarify the context"), //TODO: improve description
+                nested: None,
+            },
+        }
+    }
+
+    pub fn completed_with_error(err: BitacoraError) -> Self {
+        ErrorResponse {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            body: ErrorResponseBody {
+                code: 1100,
+                message: String::from("Operation completed with errors"),
+                description: format!("The operation completed with the following error: {:?}", err),
+                nested: Option::Some(Box::new(ErrorResponse::from(err).body)),
             },
         }
     }
@@ -91,7 +111,7 @@ impl From<BitacoraError> for ErrorResponse {
             BitacoraError::Web3Error => ErrorResponse::web3_error(),
             BitacoraError::StorageError(err) => err.into(),
             BitacoraError::BadId(_id_err) => ErrorResponse::bad_input("id", None),
-            BitacoraError::CompletedWithError(_) => unimplemented!(),
+            BitacoraError::CompletedWithError(err) => ErrorResponse::completed_with_error(*err),
         }
     }
 }

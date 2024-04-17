@@ -130,7 +130,7 @@ where
                 dataset.web3 = Some(web3_info);
                 Ok(())
             }
-            Err(_) => Err(BitacoraError::Web3Error),
+            Err(_err) => Err(BitacoraError::Web3Error),
         }
     }
 

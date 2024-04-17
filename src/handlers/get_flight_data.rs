@@ -6,6 +6,8 @@ use axum::{
 };
 use serde::Serialize;
 
+use tracing::info;
+
 use crate::state::entities::{DatasetId, FlightData};
 use crate::SharedBitacora;
 use crate::{
@@ -27,6 +29,10 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     Path(id): Path<String>,
     State(state): State<SharedBitacora<S, T>>,
 ) -> Response {
+    info!(
+        flight_data_id = id,
+        "GET /flight_data/{}", id
+    );
     let fd_id = match FlightDataId::try_from(id) {
         Ok(fd_id) => fd_id,
         Err(_) => return ErrorResponse::bad_input("id", Some("Can't decode Id")).into_response(),

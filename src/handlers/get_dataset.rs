@@ -5,6 +5,8 @@ use axum::{
     Json,
 };
 
+use tracing::info;
+
 use super::errors::ErrorResponse;
 use crate::SharedBitacora;
 use crate::{
@@ -16,6 +18,10 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     Path(id): Path<String>,
     State(state): State<SharedBitacora<S, T>>,
 ) -> Response {
+    info!(
+        dataset_id = id,
+        "GET /dataset/{}", id
+    );
     match state.get_dataset(&id) {
         Ok(dataset) => {
             let mut response = (StatusCode::OK, Json(dataset)).into_response();
