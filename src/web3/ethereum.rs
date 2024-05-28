@@ -15,8 +15,6 @@ use ethers::{
 };
 
 use super::traits::{Blockchain, MerkleTreeOZReceipt, Timestamper, Tx, Web3Error, Web3Info};
-use crate::common::merkle::Keccak256;
-use crate::configuration::BitacoraConfiguration;
 use crate::state::entities::{Dataset, Device, FlightData, PublicKey};
 use crate::web3::traits::TxStatus;
 
@@ -33,26 +31,6 @@ pub struct EthereumTimestamper<M: Middleware, P: JsonRpcClient> {
     provider: Arc<Provider<P>>,
     contract: EthBitacoraContract<M>,
     pub status: EthereumTimestamperState,
-}
-
-fn generate_bitacora_contract_info() -> (ethers::abi::Abi, ethers::types::Bytes) {
-    let contract_base_path = BitacoraConfiguration::get_web3_contract_base_dir();
-    let contract_path = Path::new(&contract_base_path);
-    let compiled = Solc::default().compile_source(contract_path).unwrap();
-    let (abi, bytecode, _runtime_bytecode) = compiled
-        .find("Bitacora")
-        .expect("could not find contract")
-        .into_parts_or_default();
-    (abi, bytecode)
-}
-
-pub async fn deploy_new_bitacora_contract_instance<P: JsonRpcClient>(
-    provider: Provider<P>,
-) -> Address {
-    let (abi, bytecode) = generate_bitacora_contract_info();
-    let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), Arc::new(provider));
-    let contract = factory.deploy(()).unwrap().send().await.unwrap();
-    contract.address()
 }
 
 pub fn new_ethereum_timestamper<M: Middleware, P: JsonRpcClient>(
@@ -91,80 +69,80 @@ pub fn new_ethereum_timestamper_from_http(
     })
 }
 
-pub async fn new_ethereum_timestamper_from_devnode() -> (
-    EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>,
-    AnvilInstance,
-) {
-    // 1. Start dev node and configure contract paths
-    let anvil = Anvil::new().spawn();
+// pub async fn new_ethereum_timestamper_from_devnode() -> (
+//     EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>,
+//     AnvilInstance,
+// ) {
+//     // 1. Start dev node and configure contract paths
+//     let anvil = Anvil::new().spawn();
 
-    let (abi, bytecode) = generate_bitacora_contract_info();
+//     let (abi, bytecode) = generate_bitacora_contract_info();
 
-    // 2. instantiate wallet
-    let wallet: LocalWallet = anvil.keys()[0].clone().into();
+//     // 2. instantiate wallet
+//     let wallet: LocalWallet = anvil.keys()[0].clone().into();
 
-    // 3. connect to the network
-    let provider = Provider::<Http>::try_from(anvil.endpoint())
-        .unwrap()
-        .interval(Duration::from_millis(10u64));
+//     // 3. connect to the network
+//     let provider = Provider::<Http>::try_from(anvil.endpoint())
+//         .unwrap()
+//         .interval(Duration::from_millis(10u64));
 
-    // 4. instantiate the client with the wallet
-    let client = SignerMiddleware::new(provider, wallet.with_chain_id(anvil.chain_id()));
-    let client = Arc::new(client);
+//     // 4. instantiate the client with the wallet
+//     let client = SignerMiddleware::new(provider, wallet.with_chain_id(anvil.chain_id()));
+//     let client = Arc::new(client);
 
-    // 5. create a factory which will be used to deploy instances of the contract
-    let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), client.clone());
+//     // 5. create a factory which will be used to deploy instances of the contract
+//     let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), client.clone());
 
-    // 6. deploy it with the constructor arguments
-    let contract = factory.deploy(()).unwrap().send().await.unwrap();
+//     // 6. deploy it with the constructor arguments
+//     let contract = factory.deploy(()).unwrap().send().await.unwrap();
 
-    let provider = Provider::<Http>::try_from(anvil.endpoint())
-        .unwrap()
-        .interval(Duration::from_millis(10u64));
-    let timestamper = new_ethereum_timestamper(client, provider, contract.address());
-    if timestamper.is_err() {
-        panic!("Error creating timestamp");
-    }
-    (timestamper.unwrap(), anvil)
-}
+//     let provider = Provider::<Http>::try_from(anvil.endpoint())
+//         .unwrap()
+//         .interval(Duration::from_millis(10u64));
+//     let timestamper = new_ethereum_timestamper(client, provider, contract.address());
+//     if timestamper.is_err() {
+//         panic!("Error creating timestamp");
+//     }
+//     (timestamper.unwrap(), anvil)
+// }
 
-pub async fn new_ethereum_timestamper_from_url_with_sk(
-    url: &Uri,
-    sk: &str,
-) -> Result<
-    EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>,
-    Web3Error,
-> {
-    let (abi, bytecode) = generate_bitacora_contract_info();
+// pub async fn new_ethereum_timestamper_from_url_with_sk(
+//     url: &Uri,
+//     sk: &str,
+// ) -> Result<
+//     EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>,
+//     Web3Error,
+// > {
+//     let (abi, bytecode) = generate_bitacora_contract_info();
 
-    // 2. instantiate wallet
-    let wallet: LocalWallet = sk.parse::<LocalWallet>().unwrap();
-    // 3. connect to the network
-    let provider = Provider::<Http>::try_from(url.to_string()).unwrap();
-    let chain_id = match provider.get_chainid().await {
-        Ok(chain_id) => chain_id,
-        Err(_) => return Err(Web3Error::ProviderConnectionFailed),
-    };
+//     // 2. instantiate wallet
+//     let wallet: LocalWallet = sk.parse::<LocalWallet>().unwrap();
+//     // 3. connect to the network
+//     let provider = Provider::<Http>::try_from(url.to_string()).unwrap();
+//     let chain_id = match provider.get_chainid().await {
+//         Ok(chain_id) => chain_id,
+//         Err(_) => return Err(Web3Error::ProviderConnectionFailed),
+//     };
 
-    // 4. instantiate the client with the wallet
-    let client = SignerMiddleware::new(provider, wallet.with_chain_id(chain_id.as_u64()));
-    let client = Arc::new(client);
+//     // 4. instantiate the client with the wallet
+//     let client = SignerMiddleware::new(provider, wallet.with_chain_id(chain_id.as_u64()));
+//     let client = Arc::new(client);
 
-    // 5. create a factory which will be used to deploy instances of the contract
-    let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), client.clone());
+//     // 5. create a factory which will be used to deploy instances of the contract
+//     let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), client.clone());
 
-    // 6. deploy it with the constructor arguments
-    let contract = factory.deploy(()).unwrap().send().await.unwrap();
+//     // 6. deploy it with the constructor arguments
+//     let contract = factory.deploy(()).unwrap().send().await.unwrap();
 
-    let provider = Provider::<Http>::try_from(url.to_string())
-        .unwrap()
-        .interval(Duration::from_millis(10u64));
-    let timestamper = new_ethereum_timestamper(client, provider, contract.address());
-    if timestamper.is_err() {
-        panic!("Error creating timestamp");
-    }
-    Ok(timestamper.unwrap())
-}
+//     let provider = Provider::<Http>::try_from(url.to_string())
+//         .unwrap()
+//         .interval(Duration::from_millis(10u64));
+//     let timestamper = new_ethereum_timestamper(client, provider, contract.address());
+//     if timestamper.is_err() {
+//         panic!("Error creating timestamp");
+//     }
+//     Ok(timestamper.unwrap())
+// }
 
 pub async fn new_ethereum_timestamper_from_http_addr_sk(
     url: &Uri,

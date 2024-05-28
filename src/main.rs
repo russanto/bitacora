@@ -4,10 +4,7 @@ use axum::{
 };
 use clap::Parser;
 use state::bitacora::Bitacora;
-use web3::{
-    ethereum::new_ethereum_timestamper_from_http_addr_sk,
-    ethereum::new_ethereum_timestamper_from_url_with_sk, traits::Timestamper,
-};
+use web3::ethereum::new_ethereum_timestamper_from_http_addr_sk;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -25,7 +22,7 @@ use handlers::{
     get_dataset, get_device, get_flight_data, post_device, post_flight_data,
     post_verify_flight_data,
 };
-use storage::{in_memory::InMemoryStorage, redis::RedisStorage, storage::FullStorage};
+use storage::redis::RedisStorage;
 
 type SharedBitacora<S, T> = Arc<Bitacora<S, T>>;
 
@@ -46,17 +43,10 @@ async fn main() {
         None => panic!("Private key signer is only supported. Please provide one."),
     };
 
-    let maybe_contract_addr = Conf::get_web3_contract_address();
-    let timestamper = match maybe_contract_addr {
-        Some(addr) => {
-            new_ethereum_timestamper_from_http_addr_sk(&Conf::get_web3_uri(), addr, &private_key)
+    let contract_addr = Conf::get_web3_contract_address().expect("Contract address is required");
+    let timestamper = new_ethereum_timestamper_from_http_addr_sk(&Conf::get_web3_uri(), contract_addr, &private_key)
                 .await
-                .unwrap()
-        }
-        None => new_ethereum_timestamper_from_url_with_sk(&Conf::get_web3_uri(), &private_key)
-            .await
-            .unwrap(),
-    };
+                .unwrap();
 
     let shared_bitacora = Arc::new(Bitacora::new(
         RedisStorage::new(Conf::get_redis_connection_string().as_str()).unwrap(),

@@ -1,7 +1,7 @@
 FROM rust:1.70-buster as builder
 COPY . /bitacora
 WORKDIR /bitacora
-RUN apt-get update && apt-get install -y wget && wget https://github.com/ethereum/solidity/releases/download/v0.8.23/solc-static-linux && chmod +x solc-static-linux
+RUN apt-get update && apt-get install -y wget && wget https://github.com/ethereum/solidity/releases/download/v0.8.19/solc-static-linux && chmod +x solc-static-linux
 RUN cargo build --release
 
 FROM debian:buster

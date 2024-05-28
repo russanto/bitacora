@@ -8,7 +8,6 @@ async function main() {
 
   console.log(`Bitacora deployed at ${bitacora.target}`);
 
-  await bitacora.registerDevice("First device", "0x0000000000000000000000000000000000000000000000000000000000123456")
 }
 
 // We recommend this pattern to be able to use async/await everywhere

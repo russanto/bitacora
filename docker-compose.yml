@@ -11,12 +11,14 @@ services:
         command: [
             "--web3", "http://web3:8545",
             "--contracts-base", "/app/contracts/contracts",
-            "--private-key", "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+            "--contract-address", "0xabEC58E12DdB39CEDC34755299Ea9b4B25631945",
+            "--private-key", "a8112819434042a710ecc16997caaa0347369969c2e562ac204a24d9be000259",
             "--redis", "redis://redis:6379",
         ]
         depends_on:
             - web3
             - redis
+            - web3_deployer
     redis:
         image: redis
         volumes:
@@ -28,9 +30,10 @@ services:
         ports:
             - 80:80
     web3:
-        image: ghcr.io/foundry-rs/foundry:nightly-5be158ba6dc7c798a6f032026fe60fc01686b33b
-        environment:
-            - ANVIL_IP_ADDR=0.0.0.0
-        command: ["anvil"]
+        image: clique-devnet
+        build: ./devnet
+    web3_deployer:
+        image: bitacora_deployer
+        build: ./contracts
 volumes:
     redis:
