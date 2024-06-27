@@ -80,7 +80,9 @@ impl ErrorResponse {
             body: ErrorResponseBody {
                 code: 1004,
                 message: String::from("Error with the web3 interaction"),
-                description: format!("The Web3 operation failed. Nested error should clarify the context"), //TODO: improve description
+                description: format!(
+                    "The Web3 operation failed. Nested error should clarify the context"
+                ), //TODO: improve description
                 nested: None,
             },
         }
@@ -92,7 +94,10 @@ impl ErrorResponse {
             body: ErrorResponseBody {
                 code: 1100,
                 message: String::from("Operation completed with errors"),
-                description: format!("The operation completed with the following error: {:?}", err),
+                description: format!(
+                    "The operation completed with the following error: {:?}",
+                    err
+                ),
                 nested: Option::Some(Box::new(ErrorResponse::from(err).body)),
             },
         }

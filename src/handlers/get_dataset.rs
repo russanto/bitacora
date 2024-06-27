@@ -18,20 +18,21 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     Path(id): Path<String>,
     State(state): State<SharedBitacora<S, T>>,
 ) -> Response {
-    info!(
-        dataset_id = id,
-        "GET /dataset/{}", id
-    );
+    info!(dataset_id = id, "GET /dataset/{}", id);
     match state.get_dataset(&id) {
         Ok(dataset) => {
             let mut response = (StatusCode::OK, Json(dataset)).into_response();
-            response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
             response
-        },
+                .headers_mut()
+                .insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+            response
+        }
         Err(error) => {
             let mut response = ErrorResponse::from(error).into_response();
-            response.headers_mut().insert("Access-Control-Allow-Origin", "*".parse().unwrap());
             response
-        },
+                .headers_mut()
+                .insert("Access-Control-Allow-Origin", "*".parse().unwrap());
+            response
+        }
     }
 }
