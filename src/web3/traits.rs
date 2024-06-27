@@ -17,9 +17,40 @@ pub enum Web3Error {
 
 #[async_trait]
 pub trait Timestamper {
+
+    /// The MerkleTree type used by the Timestamper to handle off-chain collections
     type MerkleTree: MerkleTree;
 
+    /// Register a new device on the blockchain and returns the respective traceability information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `device` - The device to be registered
+    /// 
+    /// # Returns
+    /// 
+    /// A Web3Result containing the traceability information of the device registration
+    /// 
+    /// # Errors
+    /// 
+    /// A Web3Error describing the registration failure
     async fn register_device(&self, device: &Device) -> Web3Result;
+
+    /// Register a new dataset on the blockchain and returns the respective traceability information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `dataset` - The dataset to be registered
+    /// * `device_id` - The ID of the device that owns the dataset
+    /// * `flight_datas` - The flight datas that compose the dataset
+    /// 
+    /// # Returns
+    /// 
+    /// A Web3Result containing the traceability information of the dataset registration
+    /// 
+    /// # Errors
+    /// 
+    /// A Web3Error describing the registration failure
     async fn register_dataset(
         &self,
         dataset: &Dataset,
@@ -27,6 +58,21 @@ pub trait Timestamper {
         flight_datas: &[FlightData],
     ) -> Result<Web3Info, Web3Error>;
 
+    /// Computes the Merkle Proof of a FlightData entry given its traceability information
+    /// 
+    /// # Arguments
+    /// 
+    /// * `fd` - The FlightData entry to compute the Merkle Proof for
+    /// * `flight_datas` - The collection of FlightData entries included in the dataset
+    /// * `dataset_receipt` - The traceability information of the dataset the FlightData entry belongs to
+    /// 
+    /// # Returns
+    /// 
+    /// A Web3Result containing the Merkle Proof of the FlightData entry
+    /// 
+    /// # Errors
+    /// 
+    /// A Web3Error describing the Merkle Proof computation failure
     fn flight_data_web3_info(
         fd: &FlightData,
         flight_datas: &[FlightData],
@@ -46,6 +92,7 @@ pub trait Timestamper {
     }
 }
 
+/// The status of a transaction on the blockchain
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum TxStatus {
     Submitted,

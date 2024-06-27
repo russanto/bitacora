@@ -44,7 +44,7 @@ enum EVMTimestamperOperation {
 
 pub struct EVMTimestamper {
     sender: mpsc::UnboundedSender<EVMTimestamperEnvelope>,
-    pub at: Address,
+    at: Address,
 }
 
 impl EVMTimestamper {
@@ -100,6 +100,10 @@ impl EVMTimestamper {
             }
         });
         Ok(EVMTimestamper { sender, at })
+    }
+
+    pub fn address(&self) -> Address {
+        self.at.clone()
     }
 
     async fn handle_tx<T, P, D, N>(
