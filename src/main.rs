@@ -1,10 +1,12 @@
+use alloy::{network::EthereumWallet, primitives::FixedBytes, signers::local::PrivateKeySigner};
 use axum::{
     routing::{get, post},
     Router,
 };
 use clap::Parser;
+use common::prelude::Bytes32;
 use state::bitacora::Bitacora;
-use web3::ethereum::new_ethereum_timestamper_from_http_addr_sk;
+use web3::ethereum::EVMTimestamper;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -38,15 +40,16 @@ async fn main() {
         _ => (),
     }
 
-    let private_key = match Conf::get_web3_signer() {
-        Some(sk) => sk,
+    let private_key: Bytes32 = match Conf::get_web3_signer() {
+        Some(sk) => sk.try_into().expect("Invalid"),
         None => panic!("Private key signer is only supported. Please provide one."),
     };
-
+    let signer = PrivateKeySigner::from_bytes(&FixedBytes::from(private_key.0)).unwrap();
+    let wallet = EthereumWallet::from(signer);
     let contract_addr = Conf::get_web3_contract_address().expect("Contract address is required");
-    let timestamper = new_ethereum_timestamper_from_http_addr_sk(&Conf::get_web3_uri(), contract_addr, &private_key)
-                .await
-                .unwrap();
+    let timestamper = EVMTimestamper::new(Conf::get_web3_uri().to_string(), contract_addr, wallet)
+        .await
+        .unwrap();
 
     let shared_bitacora = Arc::new(Bitacora::new(
         RedisStorage::new(Conf::get_redis_connection_string().as_str()).unwrap(),

@@ -47,9 +47,9 @@ impl Timestamper for EthereumStub {
         ))
     }
 
-    async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {
-        let mut updated_web3 = web3info.clone();
-        updated_web3.tx.status = TxStatus::Confirmed;
-        Ok(updated_web3)
-    }
+    // async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {
+    //     let mut updated_web3 = web3info.clone();
+    //     updated_web3.tx.status = TxStatus::Confirmed;
+    //     Ok(updated_web3)
+    // }
 }

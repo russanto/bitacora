@@ -1,232 +1,168 @@
-use std::{path::Path, sync::Arc, time::Duration};
+use alloy::contract::{CallBuilder, CallDecoder};
+use alloy::network::{EthereumWallet, Network};
+use alloy::primitives::Address;
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::sol;
+use alloy::transports::Transport;
 
 use async_trait::async_trait;
-use axum::http::Uri;
-use ethers::prelude::JsonRpcClient;
-use ethers::signers::Signer;
-use ethers::{
-    contract::{abigen, ContractFactory},
-    core::{k256::ecdsa::SigningKey, rand::thread_rng, types::Address, utils::Anvil},
-    middleware::{Middleware, SignerMiddleware},
-    providers::{Http, Provider},
-    signers::{LocalWallet, Wallet},
-    solc::Solc,
-    utils::AnvilInstance,
-};
 
-use super::traits::{Blockchain, MerkleTreeOZReceipt, Timestamper, Tx, Web3Error, Web3Info};
-use crate::state::entities::{Dataset, Device, FlightData, PublicKey};
-use crate::web3::traits::TxStatus;
+use tokio::sync::mpsc;
+use tokio::task;
 
 use crate::common::prelude::*;
+use crate::state::entities::{Dataset, Device, DeviceId, FlightData};
 
-abigen!(EthBitacoraContract, "./eth_bitacora.abi");
+use super::traits::{
+    Blockchain, Timestamper, Tx, TxHash, TxStatus, Web3Error, Web3Info, Web3Result,
+};
 
-pub enum EthereumTimestamperState {
-    Initialized,
-    Ready,
+sol!(
+    #[allow(missing_docs)]
+    #[sol(rpc)]
+    BitacoraContract,
+    "contracts/artifacts/contracts/Bitacora.sol/Bitacora.json"
+);
+
+#[derive(Debug)]
+pub enum TimestamperError {
+    ProviderError,
+    ContractError,
 }
 
-pub struct EthereumTimestamper<M: Middleware, P: JsonRpcClient> {
-    provider: Arc<Provider<P>>,
-    contract: EthBitacoraContract<M>,
-    pub status: EthereumTimestamperState,
+pub type TimestamperResult<T> = std::result::Result<T, Web3Error>;
+
+struct EVMTimestamperEnvelope {
+    operation: EVMTimestamperOperation,
+    response: mpsc::Sender<TimestamperResult<TxHash>>,
 }
 
-pub fn new_ethereum_timestamper<M: Middleware, P: JsonRpcClient>(
-    middleware: M,
-    provider: Provider<P>,
-    address: Address,
-) -> Result<EthereumTimestamper<M, P>, Web3Error> {
-    let client = Arc::new(middleware);
-    let provider = Arc::new(provider);
-
-    let contract = EthBitacoraContract::new(address, client);
-
-    Ok(EthereumTimestamper {
-        provider,
-        contract,
-        status: EthereumTimestamperState::Ready,
-    })
+enum EVMTimestamperOperation {
+    RegisterDevice(Device),
+    RegisterDataset(Dataset, DeviceId, Bytes32),
 }
 
-pub fn new_ethereum_timestamper_from_http(
-    endpoint: &str,
-    address: Address,
-) -> Result<EthereumTimestamper<Provider<Http>, Http>, Web3Error> {
-    let provider = match Provider::<Http>::try_from(endpoint) {
-        Ok(provider) => provider.interval(Duration::from_millis(100u64)),
-        Err(_) => return Err(Web3Error::ProviderConnectionFailed),
-    };
-    let client = Arc::new(provider);
-
-    let contract = EthBitacoraContract::new(address, client.clone());
-
-    Ok(EthereumTimestamper {
-        provider: client.clone(),
-        contract,
-        status: EthereumTimestamperState::Ready,
-    })
+pub struct EVMTimestamper {
+    sender: mpsc::UnboundedSender<EVMTimestamperEnvelope>,
+    pub at: Address,
 }
 
-// pub async fn new_ethereum_timestamper_from_devnode() -> (
-//     EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>,
-//     AnvilInstance,
-// ) {
-//     // 1. Start dev node and configure contract paths
-//     let anvil = Anvil::new().spawn();
-
-//     let (abi, bytecode) = generate_bitacora_contract_info();
-
-//     // 2. instantiate wallet
-//     let wallet: LocalWallet = anvil.keys()[0].clone().into();
-
-//     // 3. connect to the network
-//     let provider = Provider::<Http>::try_from(anvil.endpoint())
-//         .unwrap()
-//         .interval(Duration::from_millis(10u64));
-
-//     // 4. instantiate the client with the wallet
-//     let client = SignerMiddleware::new(provider, wallet.with_chain_id(anvil.chain_id()));
-//     let client = Arc::new(client);
-
-//     // 5. create a factory which will be used to deploy instances of the contract
-//     let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), client.clone());
-
-//     // 6. deploy it with the constructor arguments
-//     let contract = factory.deploy(()).unwrap().send().await.unwrap();
-
-//     let provider = Provider::<Http>::try_from(anvil.endpoint())
-//         .unwrap()
-//         .interval(Duration::from_millis(10u64));
-//     let timestamper = new_ethereum_timestamper(client, provider, contract.address());
-//     if timestamper.is_err() {
-//         panic!("Error creating timestamp");
-//     }
-//     (timestamper.unwrap(), anvil)
-// }
-
-// pub async fn new_ethereum_timestamper_from_url_with_sk(
-//     url: &Uri,
-//     sk: &str,
-// ) -> Result<
-//     EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>,
-//     Web3Error,
-// > {
-//     let (abi, bytecode) = generate_bitacora_contract_info();
-
-//     // 2. instantiate wallet
-//     let wallet: LocalWallet = sk.parse::<LocalWallet>().unwrap();
-//     // 3. connect to the network
-//     let provider = Provider::<Http>::try_from(url.to_string()).unwrap();
-//     let chain_id = match provider.get_chainid().await {
-//         Ok(chain_id) => chain_id,
-//         Err(_) => return Err(Web3Error::ProviderConnectionFailed),
-//     };
-
-//     // 4. instantiate the client with the wallet
-//     let client = SignerMiddleware::new(provider, wallet.with_chain_id(chain_id.as_u64()));
-//     let client = Arc::new(client);
-
-//     // 5. create a factory which will be used to deploy instances of the contract
-//     let factory = ContractFactory::new(abi, ethers::types::Bytes(bytecode.0), client.clone());
-
-//     // 6. deploy it with the constructor arguments
-//     let contract = factory.deploy(()).unwrap().send().await.unwrap();
-
-//     let provider = Provider::<Http>::try_from(url.to_string())
-//         .unwrap()
-//         .interval(Duration::from_millis(10u64));
-//     let timestamper = new_ethereum_timestamper(client, provider, contract.address());
-//     if timestamper.is_err() {
-//         panic!("Error creating timestamp");
-//     }
-//     Ok(timestamper.unwrap())
-// }
-
-pub async fn new_ethereum_timestamper_from_http_addr_sk(
-    url: &Uri,
-    addr: Address,
-    sk: &str,
-) -> Result<
-    EthereumTimestamper<Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>, Http>,
-    Web3Error,
-> {
-    let provider = Provider::<Http>::try_from(url.to_string()).unwrap();
-    let chain_id = match provider.get_chainid().await {
-        Ok(chain_id) => chain_id,
-        Err(_) => return Err(Web3Error::ProviderConnectionFailed),
-    };
-
-    let wallet: LocalWallet = sk.parse::<LocalWallet>().unwrap();
-    let client = SignerMiddleware::new(provider, wallet.with_chain_id(chain_id.as_u64()));
-    let client = Arc::new(client);
-
-    let contract = EthBitacoraContract::new(addr, client.clone());
-
-    let provider = Provider::<Http>::try_from(url.to_string())
-        .unwrap()
-        .interval(Duration::from_millis(10u64));
-    new_ethereum_timestamper(client, provider, contract.address())
-}
-
-impl<M: ethers::providers::Middleware + 'static, P: JsonRpcClient> EthereumTimestamper<M, P> {
-    pub async fn get_device(&self, id: String) -> Result<Device, Box<dyn std::error::Error>> {
-        let device_response = self.contract.devices(String::from(id));
-        let result = device_response.call().await?;
-        Ok(Device {
-            id: result.0,
-            pk: PublicKey::from(result.1),
-            web3: Option::None,
-        })
+impl EVMTimestamper {
+    pub async fn initialize_contract(
+        url: String,
+        wallet: EthereumWallet,
+    ) -> TimestamperResult<Address> {
+        let provider = match ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_builtin(&url)
+            .await
+        {
+            Ok(provider) => provider,
+            Err(_) => return Err(Web3Error::ProviderConnectionFailed),
+        };
+        let contract = BitacoraContract::deploy(provider).await.unwrap();
+        Ok(contract.address().clone())
     }
 
-    pub async fn get_dataset(
-        &self,
-        id: String,
-        device_id: String,
-    ) -> Result<
-        <<EthereumTimestamper<M, P> as Timestamper>::MerkleTree as MerkleTree>::Node,
-        Box<dyn std::error::Error>,
-    > {
-        let dataset_response = self.contract.get_dataset(id, device_id);
-        let result = dataset_response.call().await?;
-        Ok(Bytes32(result))
+    pub async fn new(
+        url: String,
+        at: Address,
+        wallet: EthereumWallet,
+    ) -> TimestamperResult<EVMTimestamper> {
+        let (sender, mut receiver) = mpsc::unbounded_channel::<EVMTimestamperEnvelope>();
+        let provider = match ProviderBuilder::new()
+            .with_recommended_fillers()
+            .wallet(wallet)
+            .on_builtin(&url)
+            .await
+        {
+            Ok(provider) => provider,
+            Err(_) => return Err(Web3Error::ProviderConnectionFailed),
+        };
+        let contract = BitacoraContract::new(at, provider);
+        task::spawn(async move {
+            while let Some(envelope) = receiver.recv().await {
+                match envelope.operation {
+                    EVMTimestamperOperation::RegisterDevice(device) => {
+                        let tx = contract.registerDevice(device.id.clone(), device.pk.0.into());
+                        EVMTimestamper::handle_tx(tx, &envelope.response).await;
+                    }
+                    EVMTimestamperOperation::RegisterDataset(dataset, device_id, merkle_root) => {
+                        let tx = contract.registerDataset(
+                            dataset.id.clone(),
+                            device_id,
+                            merkle_root.0.into(),
+                        );
+                        EVMTimestamper::handle_tx(tx, &envelope.response).await;
+                    }
+                };
+            }
+        });
+        Ok(EVMTimestamper { sender, at })
+    }
+
+    async fn handle_tx<T, P, D, N>(
+        call: CallBuilder<T, P, D, N>,
+        response: &mpsc::Sender<TimestamperResult<TxHash>>,
+    ) where
+        T: Transport + Send + Sync + Clone,
+        P: Provider<T, N>,
+        D: CallDecoder,
+        N: Network,
+    {
+        match call.send().await {
+            Err(_) => {
+                // If there is no one waiting there is nothing more to handle
+                let _ = response.send(Err(Web3Error::SubmissionFailed)).await;
+            }
+            Ok(tx) => {
+                match tx.watch().await {
+                    Err(_) => {
+                        // If there is no one waiting there is nothing more to handle
+                        let _ = response.send(Err(Web3Error::SubmissionFailed)).await;
+                    }
+                    Ok(tx_hash) => {
+                        // If there is no one waiting there is nothing more to handle
+                        let _ = response.send(Ok(tx_hash.0.into())).await;
+                        println!("Transaction confirmed: {:?}", tx_hash);
+                    }
+                }
+            }
+        }
     }
 }
 
 #[async_trait]
-impl<M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper
-    for EthereumTimestamper<M, P>
-{
+impl Timestamper for EVMTimestamper {
     type MerkleTree = MerkleTreeOZ;
 
-    async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error> {
-        let device_response = self
-            .contract
-            .register_device(device.id.clone(), device.pk.0);
-
-        let x = match device_response.send().await {
-            Ok(pending_tx) => {
-                let maybe_receipt = pending_tx.await;
-                match maybe_receipt {
-                    Ok(Some(receipt)) => Ok(Web3Info::new(
-                        Blockchain::devnet(),
-                        Tx::new(
-                            receipt.transaction_hash.try_into().unwrap(),
-                            TxStatus::Confirmed,
-                        ),
-                    )),
-                    Ok(None) => unimplemented!(),
-                    Err(_) => unimplemented!(),
-                }
-            }
-            Err(error) => {
-                println!("{:?}", error);
-                Err(Web3Error::SubmissionFailed)
-            }
-        };
-        x
+    async fn register_device(&self, device: &Device) -> Web3Result {
+        let (response, mut receiver) = mpsc::channel::<TimestamperResult<TxHash>>(1);
+        if self
+            .sender
+            .send(EVMTimestamperEnvelope {
+                operation: EVMTimestamperOperation::RegisterDevice(device.clone()),
+                response,
+            })
+            .is_err()
+        {
+            return Err(Web3Error::InternalServerError);
+        }
+        match receiver.recv().await {
+            Some(result) => match result {
+                Ok(tx_hash) => Ok(Web3Info {
+                    blockchain: Blockchain::ethereum(),
+                    tx: Tx {
+                        hash: tx_hash,
+                        status: TxStatus::Confirmed,
+                    },
+                    merkle_receipt: None,
+                }),
+                Err(_) => Err(Web3Error::InternalServerError),
+            },
+            None => Err(Web3Error::InternalServerError),
+        }
     }
 
     async fn register_dataset(
@@ -234,68 +170,78 @@ impl<M: ethers::providers::Middleware + 'static, P: JsonRpcClient> Timestamper
         dataset: &Dataset,
         device_id: &String,
         flight_datas: &[FlightData],
-    ) -> Result<Web3Info, Web3Error> {
+    ) -> Web3Result {
         let mut fd_mt = MerkleTreeOZ::new();
         for fd in flight_datas {
             fd_mt.append(&fd.to_bytes());
         }
         let merkle_root = fd_mt.root().unwrap();
-        let response = self.contract.register_dataset(
-            dataset.id.clone(),
-            device_id.clone(),
-            merkle_root.into(),
-        );
-
-        let x = match response.send().await {
-            Ok(pending_tx) => {
-                let maybe_receipt = pending_tx.await;
-                match maybe_receipt {
-                    Ok(Some(receipt)) => Ok(Web3Info::new_with_merkle(
-                        Blockchain::devnet(),
-                        Tx::new(
-                            receipt.transaction_hash.try_into().unwrap(),
-                            TxStatus::Confirmed,
-                        ),
-                        MerkleTreeOZReceipt::Tree(fd_mt),
-                    )),
-                    Ok(None) => unimplemented!(),
-                    Err(_) => unimplemented!(),
-                }
-            }
-            Err(error) => {
-                println!("{:?}", error);
-                Err(Web3Error::SubmissionFailed)
-            }
-        };
-        x
-    }
-
-    async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error> {
-        let x = match self
-            .provider
-            .get_transaction(web3info.tx.hash.clone())
-            .await
+        let (response, mut receiver) = mpsc::channel::<TimestamperResult<TxHash>>(1);
+        if self
+            .sender
+            .send(EVMTimestamperEnvelope {
+                operation: EVMTimestamperOperation::RegisterDataset(
+                    dataset.clone(),
+                    device_id.clone(),
+                    merkle_root,
+                ),
+                response,
+            })
+            .is_err()
         {
-            Ok(maybe_tx) => match maybe_tx {
-                Some(tx) => {
-                    println!("{:?}", tx);
-                    web3info
-                }
-                None => return Err(Web3Error::ProviderConnectionFailed),
+            return Err(Web3Error::InternalServerError);
+        }
+        match receiver.recv().await {
+            Some(result) => match result {
+                Ok(tx_hash) => Ok(Web3Info {
+                    blockchain: Blockchain::ethereum(),
+                    tx: Tx {
+                        hash: tx_hash,
+                        status: TxStatus::Confirmed,
+                    },
+                    merkle_receipt: None,
+                }),
+                Err(_) => Err(Web3Error::InternalServerError),
             },
-            Err(_) => return Err(Web3Error::ProviderConnectionFailed),
-        };
-        Ok(x.clone())
+            None => Err(Web3Error::InternalServerError),
+        }
     }
 }
 
-// TODO
-//pub struct EthereumTimestamperFactory {
-//     http: Option<Uri>,
-//     contract_address: Option<Address>,
-//     private_key: Option<String>
-// }
+#[cfg(test)]
+mod tests {
 
-// impl EthereumTimestamperFactory {
-//     pub fn create(&self) -> EthereumTimestamper<>
-// }
+    use alloy::{network::EthereumWallet, node_bindings::Anvil, signers::local::PrivateKeySigner};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_register_flow() {
+        let anvil = Anvil::new().try_spawn().unwrap();
+
+        // Set up signer from the first default Anvil account (Alice).
+        let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
+        let wallet = EthereumWallet::from(signer);
+
+        // Create a provider with the wallet.
+        let rpc_url = anvil.endpoint();
+
+        let address = EVMTimestamper::initialize_contract(rpc_url.clone(), wallet.clone())
+            .await
+            .unwrap();
+        println!("Contract address: {:?}", address);
+
+        let timestamper = EVMTimestamper::new(rpc_url, address, wallet).await.unwrap();
+        let device = Device::test_instance();
+        timestamper.register_device(&device).await.unwrap();
+
+        let mut dataset = Dataset::test_instance();
+        dataset.count = dataset.limit;
+        let fds = FlightData::test_instance_list(dataset.limit);
+
+        timestamper
+            .register_dataset(&dataset, &device.id, &fds)
+            .await
+            .unwrap();
+    }
+}

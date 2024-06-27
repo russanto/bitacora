@@ -5,10 +5,13 @@ use serde::{Deserialize, Serialize};
 use crate::common::prelude::*;
 use crate::state::entities::{Dataset, Device, FlightData};
 
+pub type Web3Result = Result<Web3Info, Web3Error>;
+
 #[derive(Debug)]
 pub enum Web3Error {
     ProviderConnectionFailed,
     SubmissionFailed,
+    InternalServerError,
     BadInputData(String),
 }
 
@@ -16,20 +19,19 @@ pub enum Web3Error {
 pub trait Timestamper {
     type MerkleTree: MerkleTree;
 
-    async fn register_device(&self, device: &Device) -> Result<Web3Info, Web3Error>;
+    async fn register_device(&self, device: &Device) -> Web3Result;
     async fn register_dataset(
         &self,
         dataset: &Dataset,
         device_id: &String,
         flight_datas: &[FlightData],
     ) -> Result<Web3Info, Web3Error>;
-    async fn update_web3(&self, web3info: &Web3Info) -> Result<Web3Info, Web3Error>;
 
     fn flight_data_web3_info(
         fd: &FlightData,
         flight_datas: &[FlightData],
         dataset_receipt: &Web3Info,
-    ) -> Result<Web3Info, Web3Error> {
+    ) -> Web3Result {
         let mut fd_mt = MerkleTreeOZ::new();
         for f in flight_datas {
             fd_mt.append(&f.to_bytes());

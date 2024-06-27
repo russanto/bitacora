@@ -8,7 +8,9 @@ mod tests {
     use crate::{
         state::{
             bitacora::Bitacora,
-            entities::{Dataset, Device, FlightData, FlightDataId, LocalizationPoint, PublicKey},
+            entities::{
+                Dataset, DatasetId, Device, FlightData, FlightDataId, LocalizationPoint, PublicKey,
+            },
         },
         storage::in_memory::InMemoryStorage,
         web3::stub::EthereumStub,
@@ -33,6 +35,18 @@ mod tests {
                 .try_into()
                 .unwrap(); // true for compressed
             Device::from(device_pk)
+        }
+    }
+
+    impl Dataset {
+        pub fn test_instance() -> Self {
+            let device = Device::test_instance();
+            Dataset {
+                id: DatasetId::from("Some Id"),
+                limit: DATASET_DEFAULT_LIMIT,
+                count: 0,
+                web3: None,
+            }
         }
     }
 

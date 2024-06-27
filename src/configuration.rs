@@ -1,5 +1,5 @@
+use alloy::primitives::Address;
 use axum::http::Uri;
-use ethers::types::Address;
 use once_cell::sync::Lazy;
 use std::sync::RwLock;
 
