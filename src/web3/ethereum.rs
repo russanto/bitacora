@@ -151,7 +151,9 @@ impl Timestamper for EVMTimestamper {
             })
             .is_err()
         {
-            return Err(Web3Error::InternalServerError);
+            return Err(Web3Error::InternalError(String::from(
+                "Internal EVMTimestamper queue is unavailable ",
+            )));
         }
         match receiver.recv().await {
             Some(result) => match result {
@@ -163,9 +165,11 @@ impl Timestamper for EVMTimestamper {
                     },
                     merkle_receipt: None,
                 }),
-                Err(_) => Err(Web3Error::InternalServerError),
+                Err(w3_err) => Err(w3_err),
             },
-            None => Err(Web3Error::InternalServerError),
+            None => Err(Web3Error::InternalError(String::from(
+                "Internal EVMTimestamper response was lost",
+            ))),
         }
     }
 
@@ -193,7 +197,9 @@ impl Timestamper for EVMTimestamper {
             })
             .is_err()
         {
-            return Err(Web3Error::InternalServerError);
+            return Err(Web3Error::InternalError(String::from(
+                "Internal EVMTimestamper queue is unavailable ",
+            )));
         }
         match receiver.recv().await {
             Some(result) => match result {
@@ -205,9 +211,11 @@ impl Timestamper for EVMTimestamper {
                     },
                     merkle_receipt: None,
                 }),
-                Err(_) => Err(Web3Error::InternalServerError),
+                Err(w3_err) => Err(w3_err),
             },
-            None => Err(Web3Error::InternalServerError),
+            None => Err(Web3Error::InternalError(String::from(
+                "Internal EVMTimestamper response was lost ",
+            ))),
         }
     }
 }

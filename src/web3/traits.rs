@@ -11,7 +11,7 @@ pub type Web3Result = Result<Web3Info, Web3Error>;
 pub enum Web3Error {
     ProviderConnectionFailed,
     SubmissionFailed,
-    InternalServerError,
+    InternalError(String),
     BadInputData(String),
 }
 
