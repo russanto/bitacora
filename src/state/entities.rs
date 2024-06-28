@@ -251,10 +251,7 @@ pub struct Dataset {
 
 impl Dataset {
     pub fn dataset_id(device_id: &DeviceId, device_dataset_counter: DatasetCounter) -> DatasetId {
-        let mut hasher = Sha256::new();
-        hasher.update(device_id);
-        hasher.update(device_dataset_counter.to_be_bytes());
-        bs58::encode(hasher.finalize()).into_string()
+        format!("{}:{}", device_id, device_dataset_counter)
     }
 
     pub fn new(device_id: DeviceId, device_dataset_counter: DatasetCounter, limit: u32) -> Self {

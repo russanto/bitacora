@@ -57,12 +57,11 @@ impl RedisStorage {
         format!("{}:{}", "dataset_flight_data", id)
     }
 
-    fn get_device_fields(device: &Device, dataset_limit: u32) -> Vec<(&str, String)> {
+    fn get_device_fields(device: &Device) -> Vec<(&str, String)> {
         let mut fields = vec![
             ("id", device.id.to_string()),
             ("public_key", device.pk.to_string()),
-            ("flight_data_count", "0".to_string()),
-            ("dataset_limit", dataset_limit.to_string()), //TODO: make it configurable
+            ("dataset_count", "0".to_string()),
         ];
         if device.web3.is_some() {
             fields.push(("web3", serde_json::to_string(&device.web3).unwrap())) //TODO: replace with something more efficient
@@ -89,6 +88,7 @@ impl RedisStorage {
             ("id", ds.id.clone()),
             ("device", Self::get_device_key(device_id)),
             ("limit", ds.limit.to_string()),
+            ("count", ds.count.to_string()),
         ];
         if ds.web3.is_some() {
             fields.push(("web3", serde_json::to_string(&ds.web3).unwrap())) //TODO: replace with something more efficient
@@ -170,11 +170,14 @@ impl RedisStorage {
         if !dataset_data.contains_key("limit") {
             return Err(Error::MalformedData("limit".to_string()));
         }
+        if !dataset_data.contains_key("count") {
+            return Err(Error::MalformedData("limit".to_string()));
+        }
         let id: DatasetId = dataset_data.get("id").unwrap().parse().unwrap();
         let mut dataset = Dataset {
             id: id.clone(),
             limit: dataset_data.get("limit").unwrap().parse().unwrap(),
-            count: conn.scard(Self::get_dataset_flight_data_key(&id))?,
+            count: dataset_data.get("count").unwrap().parse().unwrap(),
             web3: None,
         };
         match dataset_data.get("web3") {
@@ -190,13 +193,22 @@ impl RedisStorage {
 impl DeviceStorage for RedisStorage {
     fn new_device(&self, device: &Device, dataset_limit: u32) -> Result<()> {
         let device_key = Self::get_device_key(&device.id);
-        let fields = Self::get_device_fields(device, dataset_limit);
-        //Note: The following is ok only in the assumption this is the only connection accessing Redis.
+        let device_fields = Self::get_device_fields(device);
         let mut cnx_lock = self.conn.lock().unwrap();
         if cnx_lock.exists(device_key.clone())? {
             return Err(Error::AlreadyExists);
         }
-        cnx_lock.hset_multiple(device_key, &fields)?;
+        let dataset = Dataset::new(device.id.clone(), 0, dataset_limit);
+        let dataset_key = Self::get_dataset_key(&dataset.id);
+        let dataset_fields = Self::get_dataset_fields(&dataset, &device.id);
+        // Should add a watch on the device key in case there are two concurrent requests
+        redis::pipe()
+            .atomic()
+            .hset_multiple(device_key.clone(), &device_fields)
+            .ignore()
+            .hset_multiple(dataset_key.clone(), &dataset_fields)
+            .ignore()
+            .query(&mut *cnx_lock)?;
         Ok(())
     }
 
@@ -249,52 +261,25 @@ impl DeviceStorage for RedisStorage {
 
 impl FlightDataStorage for RedisStorage {
     fn new_flight_data(&self, fd: &FlightData, device_id: &DeviceId) -> Result<Dataset> {
-        let fd_key = Self::get_flight_data_key(&fd.id);
+        let script = include_str!("redis_script/new_flight_data.lua");
+
         let device_key = Self::get_device_key(device_id);
+        let fd_key = Self::get_flight_data_key(&fd.id);
         let device_fd_key = Self::get_device_flight_data_key(device_id);
+
         let mut conn_lock = self.conn.lock().unwrap();
-        if !conn_lock.exists(device_key.clone())? {
-            return Err(Error::NotFound(Entity::Device));
-        }
-        if conn_lock.exists(fd_key.clone())? {
-            return Err(Error::AlreadyExists);
-        }
-        let dataset_limit: u32 = conn_lock.hget(device_key.clone(), "dataset_limit")?;
-        let fd_count: u32 = conn_lock.hincr(device_key.clone(), "flight_data_count", 1)?;
-        let dataset = match fd_count % dataset_limit {
-            1 => {
-                //New dataset
-                let mut dataset =
-                    Dataset::new(device_id.clone(), fd_count / dataset_limit, dataset_limit);
-                dataset.count = 1;
-                Self::no_lock_create_dataset(&mut conn_lock, &dataset, device_id)?;
-                dataset
-            }
-            value => {
-                //Existing dataset
-                let dataset_key = conn_lock.hget(device_key.clone(), "current_dataset")?;
-                let mut dataset = Self::no_lock_get_dataset(&mut conn_lock, dataset_key)?;
-                dataset.count = match value {
-                    0 => dataset_limit,
-                    _ => value,
-                };
-                dataset.limit = dataset_limit;
-                dataset
-            }
-        };
-        // FlightData may arrive out of order so need a dedicated set to match them with the dataset
-        conn_lock.sadd(
-            Self::get_dataset_flight_data_key(&dataset.id),
-            fd_key.clone(),
-        )?;
-        let fields = Self::get_flight_data_fields(fd, &dataset.id);
-        conn_lock.hset_multiple(fd_key, &fields)?;
-        conn_lock.zadd(
-            device_fd_key,
-            Self::get_flight_data_key(&fd.id),
-            fd.timestamp,
-        )?;
-        Ok(dataset)
+        let redis_script = redis::Script::new(script);
+        let mut script_invocation = redis_script.key(device_key.clone());
+        script_invocation
+            .key(fd_key.clone())
+            .key(device_fd_key.clone())
+            .arg(fd.id.to_string())
+            .arg(fd.signature.clone())
+            .arg(fd.timestamp)
+            .arg(serde_json::to_string(&fd.localization).unwrap())
+            .arg(STANDARD.encode(fd.payload.as_slice()));
+        let result: String = script_invocation.invoke(&mut *conn_lock)?;
+        Ok(Self::no_lock_get_dataset(&mut conn_lock, result)?)
     }
 
     fn get_flight_data(&self, id: &FlightDataId) -> Result<FlightData> {
@@ -323,20 +308,18 @@ impl FlightDataStorage for RedisStorage {
 
     fn get_latest_dataset(&self, device_id: &DeviceId) -> Result<Option<Dataset>> {
         let mut conn_lock = self.conn.lock().unwrap();
-        let dataset_key: String =
-            conn_lock.hget(Self::get_device_key(device_id), "current_dataset")?;
-        if dataset_key.is_empty() {
-            return Err(Error::MalformedData("current_dataset".to_string()));
-        }
+        let dataset_counter: DatasetCounter =
+            conn_lock.hget(Self::get_device_key(device_id), "dataset_count")?;
         Ok(Some(Self::no_lock_get_dataset(
             &mut conn_lock,
-            dataset_key,
+            Self::get_dataset_key(&Dataset::dataset_id(device_id, dataset_counter)),
         )?))
     }
 
     fn get_dataset_flight_datas(&self, ds_id: &DatasetId) -> Result<Vec<FlightData>> {
         let mut conn_lock = self.conn.lock().unwrap();
-        let fd_keys: Vec<String> = conn_lock.smembers(Self::get_dataset_flight_data_key(ds_id))?;
+        let fd_keys: Vec<String> =
+            conn_lock.zrange(Self::get_dataset_flight_data_key(ds_id), 0, -1)?; // 0 to -1 is the whole range
         let mut fds = Vec::new();
         for fd_key in fd_keys {
             fds.push(Self::no_lock_get_flight_data(&mut conn_lock, fd_key)?);
@@ -364,7 +347,7 @@ mod tests {
 
     use redis::Commands;
 
-    use crate::state::entities::{Device, FlightData};
+    use crate::state::entities::{Dataset, Device, FlightData};
     use crate::storage::errors::Error as StorageError;
     use crate::storage::redis::RedisStorage;
     use crate::storage::storage::{DeviceStorage, FlightDataStorage};
@@ -388,6 +371,17 @@ mod tests {
             .exists(RedisStorage::get_device_key(&device.id))
             .unwrap();
         assert!(device_exists);
+        let dataset = storage
+            .get_dataset(&Dataset::dataset_id(&device.id, 0))
+            .expect("Could not get the associated dataset");
+        assert_eq!(
+            dataset.limit, DEFAULT_DATASET_LIMIT,
+            "The dataset limit is not the expected one"
+        );
+        assert_eq!(
+            dataset.count, 0,
+            "The dataset count is not the expected one"
+        );
     }
 
     #[test]
@@ -490,7 +484,7 @@ mod tests {
         assert_eq!(
             dataset,
             gotten_dataset.unwrap(),
-            "New Dataset and the gotten one are different"
+            "Gotten Flight Data Dataset is different from the one returned in creation"
         );
 
         let gotten_dataset = storage.get_dataset(&dataset.id);
