@@ -14,7 +14,7 @@ use crate::common::prelude::*;
 use crate::state::entities::{Dataset, Device, DeviceId, FlightData};
 
 use super::traits::{
-    Blockchain, Timestamper, Tx, TxHash, TxStatus, Web3Error, Web3Info, Web3Result,
+    Blockchain, MerkleTreeOZReceipt, MerkleTreeReceipt, Timestamper, Tx, TxHash, TxStatus, Web3Error, Web3Info, Web3Result
 };
 
 sol!(
@@ -209,7 +209,7 @@ impl Timestamper for EVMTimestamper {
                         hash: tx_hash,
                         status: TxStatus::Confirmed,
                     },
-                    merkle_receipt: None,
+                    merkle_receipt: Some(MerkleTreeReceipt::Tree(fd_mt)),
                 }),
                 Err(w3_err) => Err(w3_err),
             },
