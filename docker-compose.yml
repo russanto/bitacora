@@ -3,7 +3,6 @@ services:
     bitacora:
         image: bitacora
         build: .
-        platform: linux/amd64
         environment:
             - RUST_LOG=info
         ports:
