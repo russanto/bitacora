@@ -1,6 +1,7 @@
 use std::fmt;
 use std::{convert::TryInto, fmt::Debug, fmt::Display};
 
+use alloy::primitives::FixedBytes;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use hex::FromHexError;
 use rand::Rng;
@@ -248,4 +249,10 @@ where
     }
 
     deserializer.deserialize_str(Base64Visitor)
+}
+
+impl From<FixedBytes<32>> for Bytes32 {
+    fn from(value: FixedBytes<32>) -> Self {
+        Bytes32(value.0)
+    }
 }

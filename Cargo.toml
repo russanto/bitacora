@@ -3,8 +3,6 @@ name = "bitacora"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 alloy = { version = "0.1", features = ["full"] }
 async-trait = "0.1.74"
@@ -13,7 +11,6 @@ axum-macros = "0.3.8"
 base64 = "0.21.5"
 bs58 = "0.5.0"
 clap = { version = "4.4.12", features = ["derive"] }
-ethers = { version = "2.0.10", features = ["legacy", "solc"] }
 hex = "0.4.3"
 once_cell = "1.10.0"
 p256 = "0.13.2"
@@ -29,4 +26,5 @@ tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 
 [dev-dependencies]
-alloy = { version = "0.1", features = ["full", "node-bindings"] }
+# Need the following to have Anvil in tests
+alloy = { version = "0.1", features = ["full", "node-bindings"] } 

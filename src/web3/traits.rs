@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 
 use crate::common::prelude::*;
@@ -100,18 +99,6 @@ pub enum TxStatus {
 }
 
 pub type TxHash = Bytes32;
-
-impl From<H256> for TxHash {
-    fn from(value: H256) -> Self {
-        Bytes32(value.0)
-    }
-}
-
-impl From<TxHash> for H256 {
-    fn from(value: Bytes32) -> Self {
-        H256::from(value.0)
-    }
-}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct Tx {

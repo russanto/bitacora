@@ -3,16 +3,6 @@ mod tests {
 
     use std::{path::Path, sync::Arc, time::Duration};
 
-    use ethers::{
-        contract::ContractFactory,
-        core::{k256::ecdsa::SigningKey, utils::Anvil},
-        middleware::SignerMiddleware,
-        providers::{Http, JsonRpcClient, Middleware, Provider},
-        signers::{LocalWallet, Signer, Wallet},
-        solc::Solc,
-        utils::AnvilInstance,
-    };
-
     use crate::{
         state::entities::{Dataset, Device, FlightData, PublicKey},
         web3::{

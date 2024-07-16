@@ -14,7 +14,8 @@ use crate::common::prelude::*;
 use crate::state::entities::{Dataset, Device, DeviceId, FlightData};
 
 use super::traits::{
-    Blockchain, MerkleTreeOZReceipt, MerkleTreeReceipt, Timestamper, Tx, TxHash, TxStatus, Web3Error, Web3Info, Web3Result
+    Blockchain, MerkleTreeReceipt, Timestamper, Tx, TxHash, TxStatus, Web3Error, Web3Info,
+    Web3Result,
 };
 
 sol!(

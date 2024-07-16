@@ -1,6 +1,4 @@
-use std::{borrow::BorrowMut, cell::RefCell};
-
-use ethers::utils::keccak256;
+use alloy::primitives::keccak256;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::bytes::Bytes32;
@@ -407,7 +405,7 @@ pub type MerkleTreeOZ = MerkleTreeAppendOnly<Keccak256>;
 
 #[cfg(test)]
 mod test {
-    use crate::common::prelude::{Bytes32, Hasher};
+    use crate::common::prelude::Bytes32;
 
     use super::{Keccak256, MerkleTree, MerkleTreeAppendOnly};
 
