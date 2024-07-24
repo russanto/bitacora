@@ -6,7 +6,7 @@ const QueryResult = () => {
   const { id } = useParams();
 
   useEffect(() => {
-    const BASE_URL = 'http://localhost:3000/dataset';
+    const BASE_URL = `http://${window.location.hostname}:3000/dataset`;
     const url = `${BASE_URL}/${id}`;
 
     fetch(url)
