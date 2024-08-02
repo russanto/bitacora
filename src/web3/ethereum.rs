@@ -250,7 +250,7 @@ mod tests {
 
         let mut dataset = Dataset::test_instance();
         dataset.count = dataset.limit;
-        let fds = FlightData::test_instance_list(dataset.limit);
+        let fds = FlightData::test_instance_list(dataset.limit, &device.id);
 
         timestamper
             .register_dataset(&dataset, &device.id, &fds)

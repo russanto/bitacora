@@ -23,9 +23,9 @@ local dataset_limit = tonumber(redis.call("HGET", dataset_key, "limit"))
 -- Create or update dataset
 if dataset_fd_count == dataset_limit then
     -- New dataset
-    local dataset_count = tonumber(redis.call("HINCRBY", device_key, "dataset_count", 1))
-    local dataset_id = device_id .. ":" .. dataset_count
-    local dataset_key = "dataset:" .. dataset_id
+    dataset_count = tonumber(redis.call("HINCRBY", device_key, "dataset_count", 1))
+    dataset_id = device_id .. ":" .. dataset_count
+    dataset_key = "dataset:" .. dataset_id
     redis.call("HSET", dataset_key, "id", dataset_id)
     redis.call("HSET", dataset_key, "device", device_key)
     redis.call("HSET", dataset_key, "limit", dataset_limit)

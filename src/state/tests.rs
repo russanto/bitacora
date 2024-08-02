@@ -65,16 +65,15 @@ mod tests {
             }
         }
 
-        pub fn test_instance_list(n: u32) -> Vec<Self> {
-            let device = Device::test_instance();
-            let prototype = Self::test_instance(&device.id);
+        pub fn test_instance_list(n: u32, device_id: &DeviceId) -> Vec<Self> {
+            let prototype = Self::test_instance(device_id);
             let mut flight_datas: Vec<FlightData> = Vec::new();
             for i in 0..n {
                 let mut fd = prototype.clone();
                 fd.timestamp += 1000u64 * i as u64; // assume a FlightData object each second
-                fd.localization.latitude += 0.01 * i as f64; // just to change data
+                fd.localization.longitude += 0.01 * i as f64; // just to change data
                 fd.localization.latitude += 0.01 * i as f64;
-                fd.id = FlightDataId::new(fd.timestamp, &device.id);
+                fd.id = FlightDataId::new(fd.timestamp, device_id);
                 flight_datas.push(fd);
             }
             flight_datas
@@ -92,7 +91,7 @@ mod tests {
     async fn test_basic_flow_on_in_memory_storage() {
         //TODO: Why it panics with two equal FlightData ?
         let mut device = Device::test_instance();
-        let flight_datas = FlightData::test_instance_list(DATASET_DEFAULT_LIMIT * 2);
+        let flight_datas = FlightData::test_instance_list(DATASET_DEFAULT_LIMIT * 2, &device.id);
 
         let bitacora = new_bitacora_from_stubs();
 

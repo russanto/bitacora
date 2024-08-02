@@ -345,6 +345,8 @@ impl From<RedisError> for Error {
 #[cfg(test)]
 mod tests {
 
+    use std::borrow::Borrow;
+
     use redis::Commands;
 
     use crate::state::entities::{Dataset, Device, FlightData};
@@ -505,6 +507,126 @@ mod tests {
         );
         assert_eq!(
             vec![fd],
+            gotten_fds.unwrap(),
+            "New FlightData and the gotten one are different"
+        );
+    }
+
+    #[test]
+    fn test_new_dataset_on_dataset_limit() {
+        // Test setup
+        let storage = get_storage_instance();
+        let device = Device::test_instance();
+        // Creates a new test device
+        let new_device_result = storage.new_device(&device, DEFAULT_DATASET_LIMIT);
+        assert!(new_device_result.is_ok(), "Could not create a Device");
+
+        let mut fds = FlightData::test_instance_list(DEFAULT_DATASET_LIMIT + 1, &device.id);
+        let fd_in_new_dataset = fds.pop().unwrap();
+
+        let mut current_dataset = storage.get_latest_dataset(&device.id).unwrap().unwrap();
+
+        // Test body
+
+        // Fulfil the initial Dataset
+        for i in 0..fds.len() {
+            let fd = fds.get(i).unwrap();
+            let new_fd_result = storage.new_flight_data(fd, &device.id);
+            assert!(
+                new_fd_result.is_ok(),
+                "Could not create {:}-th FlightData: {:?}",
+                i,
+                new_fd_result.err().unwrap()
+            );
+
+            let gotten_fd = storage.get_flight_data(&fd.id);
+            assert!(
+                gotten_fd.is_ok(),
+                "Could not get {:}-th FlightData: {:?}",
+                i,
+                gotten_fd.err().unwrap()
+            );
+            assert_eq!(
+                fd,
+                &gotten_fd.unwrap(),
+                "New FlightData and the gotten one are different at index {:}",
+                i
+            );
+
+            current_dataset.count += 1;
+            assert_eq!(
+                current_dataset,
+                new_fd_result.unwrap(),
+                "The reference Dataset changed while it is not supposed at index {:}",
+                i
+            );
+        }
+
+        // Add one more Dataset to create a new one
+        let new_dataset = storage.new_flight_data(&fd_in_new_dataset, &device.id);
+        assert!(
+            new_dataset.is_ok(),
+            "Could not create the FlightData in the new Dataset: {:?}",
+            new_dataset.err().unwrap()
+        );
+        let new_dataset = new_dataset.unwrap();
+
+        // Check it is a new dataset
+        assert_ne!(
+            current_dataset.id,
+            new_dataset.id,
+            "The new Dataset is the same as the previous one"
+        );
+
+        // Check new Dataset was properly created
+        assert_eq!(
+            new_dataset.count, 1,
+            "The count of the new dataset is not 1"
+        );
+
+        // Check the latest dataset is the new one
+        let latest_dataset = storage.get_latest_dataset(&device.id);
+        assert!(latest_dataset.is_ok(), "Could not get the latest Dataset");
+        let latest_dataset = latest_dataset.unwrap();
+        assert!(latest_dataset.is_some(), "The latest Dataset is None");
+        assert_eq!(
+            new_dataset,
+            latest_dataset.unwrap(),
+            "The latest Dataset is not the expected one"
+        );
+
+        // Check the FlightData is in the new Dataset
+        let gotten_dataset = storage.get_flight_data_dataset(&fd_in_new_dataset.id);
+        assert!(
+            gotten_dataset.is_ok(),
+            "Could not get the Dataset from the FlightData"
+        );
+        assert_eq!(
+            new_dataset,
+            gotten_dataset.unwrap(),
+            "Gotten Flight Data Dataset is different from the one returned in creation"
+        );
+
+        // Check the Dataset can be retrieved
+        let gotten_dataset = storage.get_dataset(&new_dataset.id);
+        assert!(
+            gotten_dataset.is_ok(),
+            "Could not get the Dataset from the Dataset Id"
+        );
+        assert_eq!(
+            new_dataset,
+            gotten_dataset.unwrap(),
+            "New Dataset and the gotten one are different"
+        );
+
+        // Check the FlightDatas can be retrieved from the new Dataset
+        let gotten_fds = storage.get_dataset_flight_datas(&new_dataset.id);
+        assert!(
+            gotten_fds.is_ok(),
+            "Could not get the FlightDatas from the Dataset"
+        );
+        assert_eq!(
+            vec![fd_in_new_dataset],
             gotten_fds.unwrap(),
             "New FlightData and the gotten one are different"
         );

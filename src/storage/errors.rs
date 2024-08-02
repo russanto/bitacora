@@ -1,6 +1,6 @@
 use crate::state::entities::Entity;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Error {
     FailedRelatingData(String, String),
     MalformedData(String),

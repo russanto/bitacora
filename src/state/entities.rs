@@ -78,10 +78,19 @@ impl From<PublicKey> for Device {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct LocalizationPoint {
     pub longitude: f64,
     pub latitude: f64,
+}
+
+pub const GEO_POINT_PRECISION: f64 = 1e-8;
+
+impl PartialEq for LocalizationPoint {
+    fn eq(&self, other: &Self) -> bool {
+        (self.longitude - other.longitude).abs() < GEO_POINT_PRECISION
+            && (self.latitude - other.latitude).abs() < GEO_POINT_PRECISION
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
