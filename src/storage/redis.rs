@@ -573,8 +573,7 @@ mod tests {
 
         // Check it is a new dataset
         assert_ne!(
-            current_dataset.id,
-            new_dataset.id,
+            current_dataset.id, new_dataset.id,
             "The new Dataset is the same as the previous one"
         );
 

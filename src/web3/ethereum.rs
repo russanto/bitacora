@@ -10,6 +10,8 @@ use async_trait::async_trait;
 use tokio::sync::mpsc;
 use tokio::task;
 
+use tracing::info;
+
 use crate::common::prelude::*;
 use crate::state::entities::{Dataset, Device, DeviceId, FlightData};
 
@@ -130,7 +132,7 @@ impl EVMTimestamper {
                     Ok(tx_hash) => {
                         // If there is no one waiting there is nothing more to handle
                         let _ = response.send(Ok(tx_hash.0.into())).await;
-                        println!("Transaction confirmed: {:?}", tx_hash);
+                        info!(tx_hash = tx_hash.to_string(), "Transaction confirmed");
                     }
                 }
             }

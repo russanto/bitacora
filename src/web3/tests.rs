@@ -1,15 +1,7 @@
 #[cfg(test)]
 mod tests {
 
-    use std::{path::Path, sync::Arc, time::Duration};
-
-    use crate::{
-        state::entities::{Dataset, Device, FlightData, PublicKey},
-        web3::{
-            stub::EthereumStub,
-            traits::{Blockchain, MerkleTreeOZReceipt, Timestamper, Tx, TxStatus, Web3Info},
-        },
-    };
+    use crate::web3::traits::{Blockchain, Tx, TxStatus, Web3Info};
 
     use crate::common::prelude::*;
 

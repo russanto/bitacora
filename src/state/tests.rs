@@ -1,7 +1,6 @@
 mod tests {
 
     use p256::ecdsa::{SigningKey, VerifyingKey};
-    use p256::EncodedPoint;
     use rand::rngs::OsRng;
 
     use crate::state::entities::DeviceId;
@@ -40,7 +39,6 @@ mod tests {
 
     impl Dataset {
         pub fn test_instance() -> Self {
-            let device = Device::test_instance();
             Dataset {
                 id: DatasetId::from("Some Id"),
                 limit: DATASET_DEFAULT_LIMIT,
