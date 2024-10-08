@@ -21,7 +21,8 @@ local dataset_fd_count = tonumber(redis.call("HGET", dataset_key, "count"))
 local dataset_limit = tonumber(redis.call("HGET", dataset_key, "limit"))
 
 -- Create or update dataset
-if dataset_fd_count == dataset_limit then
+-- NOTE: the > case happens if dataset limit was decreased during operations
+if dataset_fd_count >= dataset_limit then
     -- New dataset
     dataset_count = tonumber(redis.call("HINCRBY", device_key, "dataset_count", 1))
     dataset_id = device_id .. ":" .. dataset_count

@@ -237,7 +237,7 @@ impl DeviceStorage for RedisStorage {
             return Err(Error::NotFound(Entity::Device));
         }
         if !device_data.contains_key("public_key") {
-            return Err(Error::Generic);
+            return Err(Error::MalformedData("Missing public_key field".to_string()));
         }
         let mut device = Device {
             id: id.clone(),

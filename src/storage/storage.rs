@@ -6,7 +6,7 @@ use super::errors::Error;
 
 /// Trait defining storage operations for devices.
 pub trait DeviceStorage {
-    /// Creates a new device. The Id of the Device is provided as input and an error is returned if it already exists.
+    /// Creates a new device. An error is returned if the Id already exists.
     ///
     /// # Arguments
     ///
