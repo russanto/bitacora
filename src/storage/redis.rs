@@ -26,6 +26,9 @@ type RedisKey = String;
 
 const PREFIX_DEVICE_KEY: &str = "device";
 
+const REDIS_ERROR_CLASS_DEVICE: &str = "ERR_DEVICE";
+const REDIS_ERROR_CLASS_FLIGHT_DATA: &str = "ERR_FLIGHT_DATA";
+
 pub struct RedisStorage {
     conn: Arc<Mutex<redis::Connection>>,
 }
@@ -96,21 +99,6 @@ impl RedisStorage {
         fields
     }
 
-    fn no_lock_create_dataset(
-        conn: &mut MutexGuard<redis::Connection>,
-        dataset: &Dataset,
-        device_id: &DeviceId,
-    ) -> Result<()> {
-        let dataset_key = Self::get_dataset_key(&dataset.id);
-        let device_key = Self::get_device_key(device_id);
-        conn.hset_multiple(
-            dataset_key.clone(),
-            &Self::get_dataset_fields(&dataset, device_id),
-        )?;
-        conn.hset(device_key, "current_dataset", dataset_key)?;
-        Ok(())
-    }
-
     fn no_lock_get_flight_data(
         conn: &mut MutexGuard<redis::Connection>,
         key: RedisKey,
@@ -162,16 +150,16 @@ impl RedisStorage {
             return Err(Error::NotFound(Entity::Dataset));
         }
         if !dataset_data.contains_key("id") {
-            return Err(Error::MalformedData("id".to_string()));
+            return Err(Error::MalformedData("Dataset:id".to_string()));
         }
         if !dataset_data.contains_key("device") {
-            return Err(Error::MalformedData("device".to_string()));
+            return Err(Error::MalformedData("Dataset:device".to_string()));
         }
         if !dataset_data.contains_key("limit") {
-            return Err(Error::MalformedData("limit".to_string()));
+            return Err(Error::MalformedData("Dataset:limit".to_string()));
         }
         if !dataset_data.contains_key("count") {
-            return Err(Error::MalformedData("limit".to_string()));
+            return Err(Error::MalformedData("Dataset:count".to_string()));
         }
         let id: DatasetId = dataset_data.get("id").unwrap().parse().unwrap();
         let mut dataset = Dataset {
@@ -182,7 +170,9 @@ impl RedisStorage {
         };
         match dataset_data.get("web3") {
             Some(serialized_web3) => {
-                dataset.web3 = serde_json::from_str(&serialized_web3).unwrap() //TODO: manage this error in case something gets corrupted outside
+                // TODO: bitacora is the only one writing and reading but we should handle this
+                // to avoid a panic in case any got corrupted
+                dataset.web3 = serde_json::from_str(&serialized_web3).unwrap()
             }
             None => (),
         };
@@ -267,7 +257,6 @@ impl FlightDataStorage for RedisStorage {
         let fd_key = Self::get_flight_data_key(&fd.id);
         let device_fd_key = Self::get_device_flight_data_key(device_id);
 
-        let mut conn_lock = self.conn.lock().unwrap();
         let redis_script = redis::Script::new(script);
         let mut script_invocation = redis_script.key(device_key.clone());
         script_invocation
@@ -278,8 +267,10 @@ impl FlightDataStorage for RedisStorage {
             .arg(fd.timestamp)
             .arg(serde_json::to_string(&fd.localization).unwrap())
             .arg(STANDARD.encode(fd.payload.as_slice()));
+
+        let mut conn_lock = self.conn.lock().unwrap();
         let result: String = script_invocation.invoke(&mut *conn_lock)?;
-        Ok(Self::no_lock_get_dataset(&mut conn_lock, result)?)
+        Self::no_lock_get_dataset(&mut conn_lock, result)
     }
 
     fn get_flight_data(&self, id: &FlightDataId) -> Result<FlightData> {
@@ -338,7 +329,15 @@ impl FullStorage for RedisStorage {}
 
 impl From<RedisError> for Error {
     fn from(value: RedisError) -> Self {
-        Error::Generic
+        if value.code().is_none() {
+            return Error::Generic;
+        }
+        // Need to handle error type when more are available
+        match value.code().unwrap() {
+            REDIS_ERROR_CLASS_DEVICE => Error::NotFound(Entity::Device),
+            REDIS_ERROR_CLASS_FLIGHT_DATA => Error::AlreadyExists,
+            _ => Error::Generic
+        }
     }
 }
 

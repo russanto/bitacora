@@ -4,12 +4,12 @@ local device_fd_key = KEYS[3]
 
 -- Check if device exists
 if redis.call("EXISTS", device_key) == 0 then
-    return redis.error_reply("Device not found")
+    return redis.error_reply("ERR_DEVICE not found")
 end
 
 -- Check if flight data already exists
 if redis.call("EXISTS", fd_key) == 1 then
-    return redis.error_reply("Flight data already exists")
+    return redis.error_reply("ERR_FLIGHT_DATA data already exists")
 end
 
 -- Check current dataset

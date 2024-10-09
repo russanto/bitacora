@@ -66,9 +66,21 @@ impl ErrorResponse {
         ErrorResponse {
             status: StatusCode::INTERNAL_SERVER_ERROR,
             body: ErrorResponseBody {
-                code: 1003,
+                code: 1004,
                 message: String::from("Error on internal data storage"),
                 description: format!("[TODO]A better description should be implemented"), //TODO: improve description
+                nested: None,
+            },
+        }
+    }
+
+    pub fn internal_storage_error(description: &str) -> Self {
+        ErrorResponse {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            body: ErrorResponseBody {
+                code: 1005,
+                message: String::from("Error on internal data storage"),
+                description: String::from(description),
                 nested: None,
             },
         }
@@ -126,6 +138,9 @@ impl From<StorageError> for ErrorResponse {
         match value {
             StorageError::NotFound(entity) => ErrorResponse::not_found(entity.to_string().as_str()),
             StorageError::AlreadyExists => ErrorResponse::already_exists(),
+            StorageError::MalformedData(what) => ErrorResponse::internal_storage_error(
+                format!("The following data field was found missing or corrupted: {}", what).as_str()
+            ),
             _ => ErrorResponse::storage_error(),
         }
     }
