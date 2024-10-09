@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
-use serde::de::{self, Unexpected, Visitor};
+use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sha2::{Digest, Sha256};
 use std::fmt;
 
-use crate::common::bytes::Bytes32DecodeError;
+use crate::common::bytes::BytesDecodeError;
 use crate::web3::traits::Web3Info;
 
 use crate::common::prelude::*;
@@ -38,13 +38,13 @@ impl From<Entity> for String {
     }
 }
 
-pub type PublicKey = Bytes32;
+pub type PublicKey = Bytes64;
 
-impl From<[u8; 32]> for PublicKey {
-    fn from(value: [u8; 32]) -> Self {
-        Bytes32(value)
-    }
-}
+// impl From<[u8; 32]> for PublicKey {
+//     fn from(value: [u8; 32]) -> Self {
+//         Bytes32::from(value.as_ref())
+//     }
+// }
 
 // impl From<PublicKey> for [u8; 32] {
 //     fn from(value: PublicKey) -> Self {
@@ -135,7 +135,7 @@ impl TryFrom<String> for FlightDataId {
                 .try_into()
                 .map(|bytes32| FlightDataId(bytes32))
                 .map_err(|err| match err {
-                    Bytes32DecodeError::BadLength(len) => {
+                    BytesDecodeError::BadLength(len) => {
                         BitacoraError::BadId(IdError::Length(len, 32))
                     }
                 }),
@@ -153,7 +153,7 @@ impl TryFrom<&String> for FlightDataId {
                 .try_into()
                 .map(|bytes32| FlightDataId(bytes32))
                 .map_err(|err| match err {
-                    Bytes32DecodeError::BadLength(len) => {
+                    BytesDecodeError::BadLength(len) => {
                         BitacoraError::BadId(IdError::Length(len, 32))
                     }
                 }),

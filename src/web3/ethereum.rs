@@ -88,7 +88,7 @@ impl EVMTimestamper {
             while let Some(envelope) = receiver.recv().await {
                 match envelope.operation {
                     EVMTimestamperOperation::RegisterDevice(device) => {
-                        let tx = contract.registerDevice(device.id.clone(), device.pk.0.into());
+                        let tx = contract.registerDevice(device.id.clone(), device.pk.try_into().unwrap());
                         EVMTimestamper::handle_tx(tx, &envelope.response).await;
                     }
                     EVMTimestamperOperation::RegisterDataset(dataset, device_id, merkle_root) => {
