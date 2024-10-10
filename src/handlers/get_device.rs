@@ -5,7 +5,7 @@ use axum::{
     Json,
 };
 
-use tracing::info;
+use tracing::{error, info};
 
 use crate::SharedBitacora;
 use crate::{
@@ -22,6 +22,9 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     info!(device_id = id, "GET /device/{}", id);
     match state.get_device(&id) {
         Ok(device) => (StatusCode::OK, Json(device)).into_response(),
-        Err(err) => ErrorResponse::from(err).into_response(),
+        Err(err) => {
+            error!(device_id = id, "Error getting device {}", err);
+            ErrorResponse::from(err).into_response()
+        },
     }
 }

@@ -6,6 +6,7 @@ use axum::{
 
 use base64::{engine::general_purpose::STANDARD, DecodeError, Engine as _};
 use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 
 use crate::state::entities::{FlightData, LocalizationPoint};
 use crate::{
@@ -64,6 +65,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
         Ok(fd) => fd,
         Err(err) => match err {
             InputFlightDataError::BadPayloadData(err) => {
+                warn!(device_id=device_id, "Failed to decode input payload for new FlightData");
                 return ErrorResponse::bad_input("payload", Some(&err.to_string())).into_response()
             }
         },
@@ -74,6 +76,13 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
             dataset_id: dataset.id,
         })
         .into_response(),
-        Err(new_fd_error) => ErrorResponse::from(new_fd_error).into_response(),
+        Err(new_fd_error) => {
+            error!(
+                device_id=device_id,
+                flight_data_id=flight_data.id.to_string(),
+                "{}", new_fd_error
+            );
+            ErrorResponse::from(new_fd_error).into_response()
+        }
     }
 }

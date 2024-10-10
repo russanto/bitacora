@@ -7,6 +7,8 @@ use axum::{
 
 use serde::Deserialize;
 
+use tracing::{error, warn};
+
 use crate::Conf;
 use crate::{
     state::entities::{Device, PublicKey},
@@ -47,6 +49,7 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
         Ok(device) => device,
         Err(error) => match error {
             POSTDeviceRequestError::FailedPKDecoding => {
+                warn!(pk=payload.pk, "Failed to decode input public key");
                 return ErrorResponse::bad_input("pk", Some("Failed to decode")).into_response()
             }
         },
@@ -57,6 +60,9 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
     };
     match state.new_device(&mut device, dataset_limit).await {
         Ok(()) => (StatusCode::CREATED, Json(device)).into_response(),
-        Err(error) => ErrorResponse::from(error).into_response(),
+        Err(error) => {
+            error!(device_id=device.id, "{}", error);
+            ErrorResponse::from(error).into_response()
+        }
     }
 }

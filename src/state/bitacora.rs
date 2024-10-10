@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tracing::{debug, info, trace};
+use tracing::{error, info, trace};
 
 use crate::common::prelude::*;
 
@@ -51,7 +51,10 @@ where
             // TODO: refactor to let it be asynchronous
             let fds = match self.storage.get_dataset_flight_datas(&dataset.id) {
                 Ok(fds) => fds,
-                Err(err) => return Err(BitacoraError::wrap_with_completed(err.into())),
+                Err(err) => {
+                    error!(dataset_id = dataset.id, "Error getting flight datas in complete dataset {}", err);
+                    return Err(BitacoraError::wrap_with_completed(err.into()))
+                },
             };
             match self.timestamp_dataset(&mut dataset, device_id, &fds).await {
                 Err(err) => return Err(BitacoraError::wrap_with_completed(err)),

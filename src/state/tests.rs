@@ -1,6 +1,9 @@
 mod tests {
 
+    use std::io::Read;
+
     use p256::ecdsa::{SigningKey, VerifyingKey};
+    use p256::elliptic_curve::sec1::Coordinates;
     use rand::rngs::OsRng;
 
     use crate::state::entities::DeviceId;
@@ -30,10 +33,9 @@ mod tests {
     impl Device {
         pub fn test_instance() -> Self {
             let (_, pk) = generate_p256_key_pair();
-            let device_pk: PublicKey = pk.to_encoded_point(true).as_bytes()[1..]
-                .try_into()
-                .unwrap(); // true for compressed
-            Device::from(device_pk)
+            let pk_point = pk.to_encoded_point(false);
+            let public: PublicKey = pk_point.as_bytes()[1..].try_into().unwrap();
+            Device::from(public)
         }
     }
 
@@ -85,48 +87,50 @@ mod tests {
         Bitacora::new(storage_in_memory, timestamper_stub)
     }
 
-    #[tokio::test]
-    async fn test_basic_flow_on_in_memory_storage() {
-        //TODO: Why it panics with two equal FlightData ?
-        let mut device = Device::test_instance();
-        let flight_datas = FlightData::test_instance_list(DATASET_DEFAULT_LIMIT * 2, &device.id);
+    // Removed, not going to actively maintain the in-memory storage
+    // 
+    // #[tokio::test]
+    // async fn test_basic_flow_on_in_memory_storage() {
+    //     //TODO: Why it panics with two equal FlightData ?
+    //     let mut device = Device::test_instance();
+    //     let flight_datas = FlightData::test_instance_list(DATASET_DEFAULT_LIMIT * 2, &device.id);
 
-        let bitacora = new_bitacora_from_stubs();
+    //     let bitacora = new_bitacora_from_stubs();
 
-        // Create the device
-        if bitacora
-            .new_device(&mut device, DATASET_DEFAULT_LIMIT)
-            .await
-            .is_err()
-        {
-            panic!("Failed adding a new Device");
-        }
+    //     // Create the device
+    //     if bitacora
+    //         .new_device(&mut device, DATASET_DEFAULT_LIMIT)
+    //         .await
+    //         .is_err()
+    //     {
+    //         panic!("Failed adding a new Device");
+    //     }
 
-        // Submit FlightData objects
-        let mut previous_dataset: Option<Dataset> = None;
-        for i in 0..flight_datas.len() {
-            let fd = flight_datas.get(i).unwrap();
-            let ds = match bitacora.new_flight_data(&fd, &device.id).await {
-                Ok(ds) => ds,
-                Err(_) => panic!("Failed adding a new FlightData"),
-            };
+    //     // Submit FlightData objects
+    //     let mut previous_dataset: Option<Dataset> = None;
+    //     for i in 0..flight_datas.len() {
+    //         let fd = flight_datas.get(i).unwrap();
+    //         let ds = match bitacora.new_flight_data(&fd, &device.id).await {
+    //             Ok(ds) => ds,
+    //             Err(_) => panic!("Failed adding a new FlightData"),
+    //         };
 
-            if ds.limit > ds.count {
-                assert!(ds.web3.is_none());
-            } else if ds.limit == ds.count {
-                assert!(ds.web3.is_some());
-            } else {
-                panic!("Dataset limit exceeded by the FlightData count");
-            }
+    //         if ds.limit > ds.count {
+    //             assert!(ds.web3.is_none());
+    //         } else if ds.limit == ds.count {
+    //             assert!(ds.web3.is_some());
+    //         } else {
+    //             panic!("Dataset limit exceeded by the FlightData count");
+    //         }
 
-            if i % DATASET_DEFAULT_LIMIT as usize != 0 {
-                assert_eq!(
-                    previous_dataset.unwrap().id,
-                    ds.id,
-                    "New FlightData returned a different Dataset than expected"
-                );
-            }
-            previous_dataset = Some(ds);
-        }
-    }
+    //         if i % DATASET_DEFAULT_LIMIT as usize != 0 {
+    //             assert_eq!(
+    //                 previous_dataset.unwrap().id,
+    //                 ds.id,
+    //                 "New FlightData returned a different Dataset than expected"
+    //             );
+    //         }
+    //         previous_dataset = Some(ds);
+    //     }
+    // }
 }
