@@ -3,7 +3,6 @@ use std::sync::RwLock;
 
 use sha2::{Digest, Sha256};
 
-use crate::configuration::BitacoraConfiguration;
 use crate::state::entities::{
     Dataset, DatasetId, Device, DeviceId, Entity, FlightData, FlightDataId,
 };

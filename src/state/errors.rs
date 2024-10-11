@@ -41,8 +41,11 @@ impl From<BitacoraError> for String {
         match value {
             BitacoraError::StorageError(error) => error.into(),
             BitacoraError::BadId(_) => "Unexpected Id format or semantic".into(),
-            BitacoraError::CompletedWithError(error) => format!("Operation partially completed with the following error: {}", error),
-            BitacoraError::Web3Error => "Error with the Web3 interaction".into()
+            BitacoraError::CompletedWithError(error) => format!(
+                "Operation partially completed with the following error: {}",
+                error
+            ),
+            BitacoraError::Web3Error => "Error with the Web3 interaction".into(),
         }
     }
 }

@@ -52,9 +52,12 @@ where
             let fds = match self.storage.get_dataset_flight_datas(&dataset.id) {
                 Ok(fds) => fds,
                 Err(err) => {
-                    error!(dataset_id = dataset.id, "Error getting flight datas in complete dataset {}", err);
-                    return Err(BitacoraError::wrap_with_completed(err.into()))
-                },
+                    error!(
+                        dataset_id = dataset.id,
+                        "Error getting flight datas in complete dataset {}", err
+                    );
+                    return Err(BitacoraError::wrap_with_completed(err.into()));
+                }
             };
             match self.timestamp_dataset(&mut dataset, device_id, &fds).await {
                 Err(err) => return Err(BitacoraError::wrap_with_completed(err)),

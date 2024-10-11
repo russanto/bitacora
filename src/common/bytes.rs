@@ -17,7 +17,7 @@ pub struct Bytes<const SIZE: usize>(pub [u8; SIZE]);
 pub type Bytes32 = Bytes<32>;
 pub type Bytes64 = Bytes<64>;
 
-impl <const SIZE: usize> Bytes<SIZE> {
+impl<const SIZE: usize> Bytes<SIZE> {
     // Do not use for crypto purpose
     pub fn random() -> Self {
         let mut rng = rand::thread_rng();
@@ -31,13 +31,13 @@ impl <const SIZE: usize> Bytes<SIZE> {
     }
 }
 
-impl <const SIZE: usize> From<[u8; SIZE]> for Bytes<SIZE> {
+impl<const SIZE: usize> From<[u8; SIZE]> for Bytes<SIZE> {
     fn from(value: [u8; SIZE]) -> Self {
         Bytes::<SIZE>(value)
     }
 }
 
-impl <const SIZE: usize> Serialize for Bytes<SIZE> {
+impl<const SIZE: usize> Serialize for Bytes<SIZE> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -84,19 +84,19 @@ impl<'de, const SIZE: usize> Deserialize<'de> for Bytes<SIZE> {
     }
 }
 
-impl <const SIZE: usize> AsRef<[u8]> for Bytes<SIZE> {
+impl<const SIZE: usize> AsRef<[u8]> for Bytes<SIZE> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl <const SIZE: usize> From<Bytes<SIZE>> for [u8; SIZE] {
+impl<const SIZE: usize> From<Bytes<SIZE>> for [u8; SIZE] {
     fn from(value: Bytes<SIZE>) -> Self {
         value.0
     }
 }
 
-impl <const SIZE: usize> From<Bytes<SIZE>> for String {
+impl<const SIZE: usize> From<Bytes<SIZE>> for String {
     fn from(value: Bytes<SIZE>) -> Self {
         String::from(&value)
     }
@@ -230,14 +230,16 @@ where
     deserializer.deserialize_str(Base64Visitor)
 }
 
-pub fn deserialize_b64_to_bytes<'de, D, const SIZE: usize>(deserializer: D) -> Result<Bytes<SIZE>, D::Error>
+pub fn deserialize_b64_to_bytes<'de, D, const SIZE: usize>(
+    deserializer: D,
+) -> Result<Bytes<SIZE>, D::Error>
 where
     D: Deserializer<'de>,
 {
     struct Base64Visitor<const SIZE: usize>;
 
     impl<'de, const SIZE: usize> Visitor<'de> for Base64Visitor<SIZE> {
-        type Value = Bytes::<SIZE>;
+        type Value = Bytes<SIZE>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("a Base64 encoded string representing $SIZE bytes")
@@ -260,13 +262,13 @@ where
     deserializer.deserialize_str(Base64Visitor)
 }
 
-impl <const SIZE: usize> From<FixedBytes<SIZE>> for Bytes<SIZE> {
+impl<const SIZE: usize> From<FixedBytes<SIZE>> for Bytes<SIZE> {
     fn from(value: FixedBytes<SIZE>) -> Self {
         Bytes::<SIZE>(value.0)
     }
 }
 
-impl <const SIZE: usize> TryFrom<Bytes<SIZE>> for FixedBytes<32> {
+impl<const SIZE: usize> TryFrom<Bytes<SIZE>> for FixedBytes<32> {
     type Error = BitacoraError;
 
     fn try_from(value: Bytes<SIZE>) -> Result<Self, Self::Error> {

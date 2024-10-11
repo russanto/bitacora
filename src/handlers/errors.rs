@@ -139,7 +139,11 @@ impl From<StorageError> for ErrorResponse {
             StorageError::NotFound(entity) => ErrorResponse::not_found(entity.to_string().as_str()),
             StorageError::AlreadyExists => ErrorResponse::already_exists(),
             StorageError::MalformedData(what) => ErrorResponse::internal_storage_error(
-                format!("The following data field was found missing or corrupted: {}", what).as_str()
+                format!(
+                    "The following data field was found missing or corrupted: {}",
+                    what
+                )
+                .as_str(),
             ),
             _ => ErrorResponse::storage_error(),
         }

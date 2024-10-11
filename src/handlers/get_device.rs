@@ -25,6 +25,6 @@ pub async fn handler<S: FullStorage, T: Timestamper>(
         Err(err) => {
             error!(device_id = id, "Error getting device {}", err);
             ErrorResponse::from(err).into_response()
-        },
+        }
     }
 }

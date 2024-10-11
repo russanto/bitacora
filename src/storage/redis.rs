@@ -336,7 +336,7 @@ impl From<RedisError> for Error {
         match value.code().unwrap() {
             REDIS_ERROR_CLASS_DEVICE => Error::NotFound(Entity::Device),
             REDIS_ERROR_CLASS_FLIGHT_DATA => Error::AlreadyExists,
-            _ => Error::Generic
+            _ => Error::Generic,
         }
     }
 }

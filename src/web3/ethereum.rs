@@ -88,7 +88,8 @@ impl EVMTimestamper {
             while let Some(envelope) = receiver.recv().await {
                 match envelope.operation {
                     EVMTimestamperOperation::RegisterDevice(device) => {
-                        let tx = contract.registerDevice(device.id.clone(), device.pk.try_into().unwrap());
+                        let tx = contract
+                            .registerDevice(device.id.clone(), device.pk.try_into().unwrap());
                         EVMTimestamper::handle_tx(tx, &envelope.response).await;
                     }
                     EVMTimestamperOperation::RegisterDataset(dataset, device_id, merkle_root) => {
@@ -126,24 +127,22 @@ impl EVMTimestamper {
                     Ok(()) => (),
                 };
             }
-            Ok(tx) => {
-                match tx.watch().await {
-                    Err(error) => {
-                        error!("Error during transaction waiting: {}", error);
-                        match response.send(Err(Web3Error::SubmissionFailed)).await {
-                            Err(error) => error!("Error returning response to requester: {}", error),
-                            Ok(()) => (),
-                        };
-                    }
-                    Ok(tx_hash) => {
-                        info!(tx_hash = tx_hash.to_string(), "Transaction confirmed");
-                        match response.send(Err(Web3Error::SubmissionFailed)).await {
-                            Err(error) => error!("Error returning response to requester: {}", error),
-                            Ok(()) => (),
-                        };
-                    }
+            Ok(tx) => match tx.watch().await {
+                Err(error) => {
+                    error!("Error during transaction waiting: {}", error);
+                    match response.send(Err(Web3Error::SubmissionFailed)).await {
+                        Err(error) => error!("Error returning response to requester: {}", error),
+                        Ok(()) => (),
+                    };
                 }
-            }
+                Ok(tx_hash) => {
+                    info!(tx_hash = tx_hash.to_string(), "Transaction confirmed");
+                    match response.send(Err(Web3Error::SubmissionFailed)).await {
+                        Err(error) => error!("Error returning response to requester: {}", error),
+                        Ok(()) => (),
+                    };
+                }
+            },
         }
     }
 }
@@ -153,7 +152,10 @@ impl Timestamper for EVMTimestamper {
     type MerkleTree = MerkleTreeOZ;
 
     async fn register_device(&self, device: &Device) -> Web3Result {
-        info!(device_id = device.id.to_string(), "Initiating device registration");
+        info!(
+            device_id = device.id.to_string(),
+            "Initiating device registration"
+        );
         let (response, mut receiver) = mpsc::channel::<TimestamperResult<TxHash>>(1);
         if self
             .sender
@@ -163,7 +165,10 @@ impl Timestamper for EVMTimestamper {
             })
             .is_err()
         {
-            error!(device_id = device.id.to_string(), "Internal EVMTimestamper queue is unavailable");
+            error!(
+                device_id = device.id.to_string(),
+                "Internal EVMTimestamper queue is unavailable"
+            );
             return Err(Web3Error::InternalError(String::from(
                 "Internal EVMTimestamper queue is unavailable ",
             )));
@@ -181,11 +186,14 @@ impl Timestamper for EVMTimestamper {
                 Err(w3_err) => Err(w3_err),
             },
             None => {
-                error!(device_id = device.id.to_string(), "Internal EVMTimestamper response was lost");
+                error!(
+                    device_id = device.id.to_string(),
+                    "Internal EVMTimestamper response was lost"
+                );
                 Err(Web3Error::InternalError(String::from(
                     "Internal EVMTimestamper response was lost",
                 )))
-            },
+            }
         }
     }
 
@@ -195,7 +203,10 @@ impl Timestamper for EVMTimestamper {
         device_id: &String,
         flight_datas: &[FlightData],
     ) -> Web3Result {
-        info!(dataset_id = dataset.id.to_string(), "Initiating dataset registration");
+        info!(
+            dataset_id = dataset.id.to_string(),
+            "Initiating dataset registration"
+        );
         let mut fd_mt = MerkleTreeOZ::new();
         for fd in flight_datas {
             fd_mt.append(&fd.to_bytes());
@@ -214,7 +225,10 @@ impl Timestamper for EVMTimestamper {
             })
             .is_err()
         {
-            error!(dataset_id = dataset.id.to_string(), "Internal EVMTimestamper queue is unavailable");
+            error!(
+                dataset_id = dataset.id.to_string(),
+                "Internal EVMTimestamper queue is unavailable"
+            );
             return Err(Web3Error::InternalError(String::from(
                 "Internal EVMTimestamper queue is unavailable ",
             )));
@@ -230,12 +244,18 @@ impl Timestamper for EVMTimestamper {
                     merkle_receipt: Some(MerkleTreeReceipt::Tree(fd_mt)),
                 }),
                 Err(w3_err) => {
-                    error!(dataset_id = dataset.id.to_string(), "Failed to register dataset: {:?}", w3_err);
+                    error!(
+                        dataset_id = dataset.id.to_string(),
+                        "Failed to register dataset: {:?}", w3_err
+                    );
                     Err(w3_err)
-                },
+                }
             },
             None => {
-                error!(dataset_id = dataset.id.to_string(), "Internal EVMTimestamper response was lost");
+                error!(
+                    dataset_id = dataset.id.to_string(),
+                    "Internal EVMTimestamper response was lost"
+                );
                 Err(Web3Error::InternalError(String::from(
                     "Internal EVMTimestamper response was lost ",
                 )))

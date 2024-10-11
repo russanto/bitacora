@@ -18,7 +18,9 @@ impl From<Error> for String {
         match value {
             Error::FailedRelatingData(e1, e2) => format!("Failed to relate {} with {}", e1, e2),
             Error::MalformedData(field) => format!("Malformed data in field: {}", field),
-            Error::InconsistentRelatedData(e1, e2) => format!("Inconsistent data between {} and {}", e1, e2),
+            Error::InconsistentRelatedData(e1, e2) => {
+                format!("Inconsistent data between {} and {}", e1, e2)
+            }
             Error::NotFound(entity) => format!("{} not found", entity),
             Error::AlreadyExists => "Entity already exists".into(),
             Error::NoOp => "No operation performed".into(),
