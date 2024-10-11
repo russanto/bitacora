@@ -200,9 +200,9 @@ where
             FlightDataId::try_from(String::from(value)).map_err(|err| match err {
                 BitacoraError::BadId(id_err) => match id_err {
                     IdError::Length(cur, exp) => E::invalid_length(cur, &self),
-                    _ => unimplemented!(),
+                    _ => E::custom("Unexpected Id format or semantic"),
                 },
-                _ => unreachable!(),
+                _ => unreachable!(), // BadId is the only case returned. We could have a dedicated error type for this
             })
         }
     }

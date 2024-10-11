@@ -7,7 +7,6 @@ use alloy::transports::Transport;
 
 use async_trait::async_trait;
 
-use clap::error;
 use tokio::sync::mpsc;
 use tokio::task;
 
@@ -120,20 +119,28 @@ impl EVMTimestamper {
         N: Network,
     {
         match call.send().await {
-            Err(_) => {
-                // If there is no one waiting there is nothing more to handle
-                let _ = response.send(Err(Web3Error::SubmissionFailed)).await;
+            Err(error) => {
+                error!("Error in transaction send: {}", error);
+                match response.send(Err(Web3Error::SubmissionFailed)).await {
+                    Err(error) => error!("Error returning response to requester: {}", error),
+                    Ok(()) => (),
+                };
             }
             Ok(tx) => {
                 match tx.watch().await {
-                    Err(_) => {
-                        // If there is no one waiting there is nothing more to handle
-                        let _ = response.send(Err(Web3Error::SubmissionFailed)).await;
+                    Err(error) => {
+                        error!("Error during transaction waiting: {}", error);
+                        match response.send(Err(Web3Error::SubmissionFailed)).await {
+                            Err(error) => error!("Error returning response to requester: {}", error),
+                            Ok(()) => (),
+                        };
                     }
                     Ok(tx_hash) => {
-                        // If there is no one waiting there is nothing more to handle
-                        let _ = response.send(Ok(tx_hash.0.into())).await;
                         info!(tx_hash = tx_hash.to_string(), "Transaction confirmed");
+                        match response.send(Err(Web3Error::SubmissionFailed)).await {
+                            Err(error) => error!("Error returning response to requester: {}", error),
+                            Ok(()) => (),
+                        };
                     }
                 }
             }
