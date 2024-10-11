@@ -137,7 +137,7 @@ impl EVMTimestamper {
                 }
                 Ok(tx_hash) => {
                     info!(tx_hash = tx_hash.to_string(), "Transaction confirmed");
-                    match response.send(Err(Web3Error::SubmissionFailed)).await {
+                    match response.send(Ok(tx_hash.into())).await {
                         Err(error) => error!("Error returning response to requester: {}", error),
                         Ok(()) => (),
                     };
