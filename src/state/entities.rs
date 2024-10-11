@@ -97,11 +97,14 @@ impl PartialEq for LocalizationPoint {
 pub struct FlightDataId(Bytes32);
 
 impl FlightDataId {
-    pub fn new(timestamp: u64, device_id: &str) -> Self {
+    pub fn new(timestamp: u64, device_id: &str, lp: &LocalizationPoint) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(FLIGHT_DATA_ID_PREFIX.to_be_bytes());
         hasher.update(timestamp.to_be_bytes());
         hasher.update(device_id);
+        let mut loc_byte_acc = lp.latitude.to_be_bytes().to_vec();
+        loc_byte_acc.extend_from_slice(&lp.longitude.to_be_bytes());
+        hasher.update(loc_byte_acc);
         FlightDataId(hasher.finalize().into())
     }
 

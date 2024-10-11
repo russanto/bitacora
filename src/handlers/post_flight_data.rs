@@ -38,7 +38,7 @@ impl TryFrom<POSTFlightDataRequest> for FlightData {
             Err(err) => return Err(InputFlightDataError::BadPayloadData(err)),
         };
         Ok(FlightData {
-            id: FlightDataId::new(value.timestamp, &value.device_id),
+            id: FlightDataId::new(value.timestamp, &value.device_id, &value.localization),
             signature: value.signature,
             timestamp: value.timestamp,
             localization: value.localization,

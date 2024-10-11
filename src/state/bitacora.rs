@@ -122,11 +122,6 @@ where
             .await
         {
             Ok(mut web3_info) => {
-                info!(
-                    dataset = dataset.id,
-                    tx_hash = web3_info.tx.hash.to_string(),
-                    "Dataset submitted to blockchain"
-                );
                 web3_info.merkle_receipt = match web3_info.merkle_receipt.unwrap() {
                     MerkleTreeOZReceipt::Tree(ref mut mt) => {
                         Some(MerkleTreeOZReceipt::Root(mt.root().unwrap()))

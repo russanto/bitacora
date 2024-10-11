@@ -53,14 +53,15 @@ mod tests {
     impl FlightData {
         pub fn test_instance(device_id: &DeviceId) -> Self {
             let timestamp = 1701305636123;
+            let lp = LocalizationPoint {
+                longitude: 14.425681,
+                latitude: 40.820948,
+            };
             FlightData {
-                id: FlightDataId::new(timestamp, device_id),
+                id: FlightDataId::new(timestamp, device_id, &lp),
                 signature: String::new(),
                 timestamp,
-                localization: LocalizationPoint {
-                    longitude: 14.425681,
-                    latitude: 40.820948,
-                },
+                localization: lp,
                 payload: Vec::new(),
             }
         }
@@ -73,7 +74,7 @@ mod tests {
                 fd.timestamp += 1000u64 * i as u64; // assume a FlightData object each second
                 fd.localization.longitude += 0.01 * i as f64; // just to change data
                 fd.localization.latitude += 0.01 * i as f64;
-                fd.id = FlightDataId::new(fd.timestamp, device_id);
+                fd.id = FlightDataId::new(fd.timestamp, device_id, &fd.localization);
                 flight_datas.push(fd);
             }
             flight_datas
